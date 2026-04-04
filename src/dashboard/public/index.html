@@ -307,7 +307,7 @@
         <input type="number" id="cfg-delay-min" value="2000" />
         <label>Delay máximo (ms)</label>
         <input type="number" id="cfg-delay-max" value="5000" />
-      <button class="btn btn-primary" onclick="saveConfig()">Salvar configurações</button>
+      <button class="btn btn-primary" id="btn-save-cfg" onclick="saveConfig()">Salvar configurações</button>
     </div>
   </div>
 
@@ -720,10 +720,18 @@ async function disconnectInstance(instanceId) {
 async function loadConfig() {
   const data = await api('GET', `/api/config/${currentTenant}`)
   document.getElementById('cfg-provider').value = data.provider || 'openai'
-  document.getElementById('cfg-model').value = data.model || 'gpt-4.1-mini'
+  // Carrega modelo correto por provider
+  if (data.provider === 'gemini') {
+    document.getElementById('cfg-model-gemini').value = data.model || 'gemini-2.0-flash'
+  } else {
+    document.getElementById('cfg-model').value = data.model || 'gpt-4.1-mini'
+  }
   document.getElementById('cfg-delay-min').value = data.delay_min || 2000
   document.getElementById('cfg-delay-max').value = data.delay_max || 5000
   document.getElementById('cfg-ai-enabled').checked = data.ai_enabled === 1
+  // Exibe keys mascaradas (ex: ••••1234) se existirem
+  document.getElementById('cfg-openai-key').value = data.openai_key || ''
+  document.getElementById('cfg-gemini-key').value = data.gemini_key || ''
   toggleProviderFields()
   updateBotToggleUI(data.bot_active ?? 1)
 }
@@ -745,15 +753,24 @@ async function saveConfig() {
     delay_max: parseInt(document.getElementById('cfg-delay-max').value),
     ai_enabled: document.getElementById('cfg-ai-enabled').checked ? 1 : 0,
   }
-  const keyOpenai = document.getElementById('cfg-openai-key').value
-  const keyGemini = document.getElementById('cfg-gemini-key').value
-  if (keyOpenai && !keyOpenai.startsWith('••')) body.openai_key = keyOpenai
-  if (keyGemini && !keyGemini.startsWith('••')) body.gemini_key = keyGemini
+  const keyOpenai = document.getElementById('cfg-openai-key').value.trim()
+  const keyGemini = document.getElementById('cfg-gemini-key').value.trim()
+
+  // Só envia a key se o usuário digitou uma nova (não começa com ••)
+  // Aceita qualquer prefixo: sk-, sk-proj-, AIza..., etc.
+  if (keyOpenai && !keyOpenai.startsWith('\u2022\u2022')) body.openai_key = keyOpenai
+  if (keyGemini && !keyGemini.startsWith('\u2022\u2022')) body.gemini_key = keyGemini
 
   setLoading('btn-save-cfg', true)
   try {
-    await api('POST', `/api/config/${currentTenant}`, body)
-    showToast('Configurações salvas!', 'success')
+    const result = await api('POST', `/api/config/${currentTenant}`, body)
+    if (result && result.ok) {
+      showToast('Configurações salvas com sucesso!', 'success')
+      // Recarrega para mostrar keys mascaradas
+      await loadConfig()
+    } else {
+      showToast('Erro ao salvar: ' + (result?.error || 'resposta inválida'), 'error')
+    }
   } catch (err) {
     showToast('Erro ao salvar configurações', 'error')
   } finally {

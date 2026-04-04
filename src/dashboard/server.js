@@ -147,8 +147,13 @@ app.get('/api/config/:tenantId', auth, (req, res) => {
 })
 
 app.post('/api/config/:tenantId', auth, (req, res) => {
-  saveConfig(req.params.tenantId, req.body)
-  res.json({ ok: true })
+  try {
+    saveConfig(req.params.tenantId, req.body)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[Config] Erro ao salvar:', err.message)
+    res.status(500).json({ error: 'Erro ao salvar configurações: ' + err.message })
+  }
 })
 
 app.post('/api/config/:tenantId/toggle-bot', auth, (req, res) => {
@@ -282,6 +287,15 @@ app.get('/api/conversations/:tenantId/:instanceId/:phone', auth, (req, res) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 await seedAdmin()
+
+// Garante que o tenant 'default' exista para evitar FK violation
+const defaultTenant = db.prepare('SELECT id FROM tenants WHERE id = ?').get('default')
+if (!defaultTenant) {
+  db.prepare('INSERT INTO tenants (id, name, email) VALUES (?, ?, ?)').run('default', 'Default', 'default@alem.zap')
+  db.prepare('INSERT OR IGNORE INTO tenant_config (tenant_id) VALUES (?)').run('default')
+  console.log('🏢 Tenant "default" criado automaticamente')
+}
+
 const server = app.listen(PORT, () => {
   console.log(`🖥️  Dashboard: http://localhost:${PORT}`)
 })
