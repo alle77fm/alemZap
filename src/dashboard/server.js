@@ -53,6 +53,19 @@ async function seedAdmin() {
 
 // ── Routes: Auth ─────────────────────────────────────────────────────────────
 
+app.get('/api/auth/check-email', async (req, res) => {
+  try {
+    const { email } = req.query
+    if (!email) return res.json({ exists: false })
+    
+    // Rota pública, retorna apenas existe/não existe
+    const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+    res.json({ exists: !!exists })
+  } catch (err) {
+    res.status(500).json({ error: 'Erro interno' })
+  }
+})
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email)

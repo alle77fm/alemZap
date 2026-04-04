@@ -181,16 +181,26 @@
     <h1>AlemZap <span style="color:#25d366">API</span></h1>
     <p>Dashboard de gerenciamento</p>
     <div id="login-alert"></div>
-    <label>Email</label>
-    <input type="email" id="login-email" placeholder="admin@empresa.com" />
-    <label>Senha</label>
-    <input type="password" id="login-password" placeholder="••••••••" />
-    <button class="btn btn-primary mt" id="btn-login" style="width:100%" onclick="login()">Entrar</button>
+    <div id="login-step-1">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="admin@empresa.com" onkeypress="if(event.key === 'Enter') checkEmail()" />
+      <button class="btn btn-primary mt" id="btn-continue" style="width:100%" onclick="checkEmail()">Continuar</button>
+    </div>
+    
+    <div id="login-step-2" style="display:none">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+        <span id="login-email-display" style="font-size:14px; color:#aaa; font-weight:500"></span>
+        <button class="btn btn-secondary btn-sm" onclick="backToStep1()" style="padding:4px 10px; font-size:12px; height:auto; min-height:0; background:transparent; border-color:#333">← Voltar</button>
+      </div>
+      <label style="margin-top:0">Senha</label>
+      <input type="password" id="login-password" placeholder="••••••••" onkeypress="if(event.key === 'Enter') login()" />
+      <button class="btn btn-primary mt" id="btn-login" style="width:100%" onclick="login()">Entrar</button>
+    </div>
   </div>
 </div>
 
 <!-- APP -->
-<div class="app-header" id="app-header">
+<div class="app-header" id="app-header" style="display:none">
   <div class="logo-text">AlemZap <span style="color:#25d366">API</span></div>
   <button id="header-bot-btn" onclick="toggleBotState()" title="Ativar/Pausar Bot">
     <span id="header-bot-icon">●</span>
@@ -570,9 +580,39 @@ async function login() {
     }
   } catch (err) {
     showToast('Erro de conexão', 'error')
-  } finally {
+    } finally {
     setLoading('btn-login', false, 'Entrar')
   }
+}
+
+async function checkEmail() {
+  const email = document.getElementById('login-email').value.trim()
+  if (!email) return
+
+  setLoading('btn-continue', true, 'Continuar')
+  try {
+    const data = await fetch(`/api/auth/check-email?email=${encodeURIComponent(email)}`).then(r => r.json())
+    if (data.exists) {
+      document.getElementById('login-email-display').textContent = email
+      document.getElementById('login-step-1').style.display = 'none'
+      document.getElementById('login-step-2').style.display = 'block'
+      document.getElementById('login-alert').innerHTML = ''
+      setTimeout(() => document.getElementById('login-password').focus(), 50)
+    } else {
+      document.getElementById('login-alert').innerHTML = `<div class="alert alert-error" style="font-size:13px">Este acesso não está cadastrado. Entre em contato com o administrador do sistema.</div>`
+    }
+  } catch (err) {
+    showToast('Erro de conexão', 'error')
+  } finally {
+    setLoading('btn-continue', false, 'Continuar')
+  }
+}
+
+function backToStep1() {
+  document.getElementById('login-step-2').style.display = 'none'
+  document.getElementById('login-step-1').style.display = 'block'
+  document.getElementById('login-password').value = ''
+  document.getElementById('login-alert').innerHTML = ''
 }
 
 async function toggleBotState() {
@@ -612,6 +652,7 @@ function logout() {
   localStorage.removeItem('token')
   token = null
   closeMenu()
+  backToStep1()
   document.getElementById('login-screen').style.display = 'flex'
   document.getElementById('app-screen').style.display = 'none'
   document.getElementById('app-header').style.display = 'none'
