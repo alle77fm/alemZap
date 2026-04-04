@@ -65,6 +65,52 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { email: user.email, role: user.role } })
 })
 
+app.post('/api/auth/change-password', auth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Campos obrigatórios ausentes' })
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Nova senha deve ter ao menos 6 caracteres' })
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' })
+
+  const valid = await bcrypt.compare(currentPassword, user.password_hash)
+  if (!valid) return res.status(401).json({ error: 'Senha atual incorreta' })
+
+  const hash = await bcrypt.hash(newPassword, 10)
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id)
+  res.json({ ok: true })
+})
+
+// ── Routes: Users ─────────────────────────────────────────────────────────────
+
+app.get('/api/users', auth, (req, res) => {
+  if (!['admin', 'superadmin'].includes(req.user.role)) return res.status(403).json({ error: 'Sem permissão' })
+  const users = db.prepare('SELECT id, email, role, tenant_id, created_at FROM users ORDER BY created_at DESC').all()
+  res.json(users)
+})
+
+app.post('/api/users', auth, async (req, res) => {
+  if (!['admin', 'superadmin'].includes(req.user.role)) return res.status(403).json({ error: 'Sem permissão' })
+  const { email, password, tenant_id, role } = req.body
+  if (!email || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' })
+  const allowedRoles = ['admin', 'viewer']
+  const userRole = allowedRoles.includes(role) ? role : 'admin'
+  try {
+    const hash = await bcrypt.hash(password, 10)
+    db.prepare('INSERT INTO users (email, password_hash, role, tenant_id) VALUES (?, ?, ?, ?)').run(email, hash, userRole, tenant_id || null)
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+app.delete('/api/users/:id', auth, (req, res) => {
+  if (!['admin', 'superadmin'].includes(req.user.role)) return res.status(403).json({ error: 'Sem permissão' })
+  if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'Não é possível remover seu próprio usuário' })
+  db.prepare('DELETE FROM users WHERE id = ?').run(parseInt(req.params.id))
+  res.json({ ok: true })
+})
+
 // ── Routes: Tenants ───────────────────────────────────────────────────────────
 
 app.get('/api/tenants', auth, (req, res) => {
