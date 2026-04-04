@@ -1,0 +1,73 @@
+import Database from 'better-sqlite3'
+import path from 'path'
+import fs from 'fs'
+
+const DATA_DIR = path.resolve('data')
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+
+const db = new Database(path.join(DATA_DIR, 'db.sqlite'))
+
+db.exec(`
+  -- Tenants (clientes do SaaS)
+  CREATE TABLE IF NOT EXISTS tenants (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- Configurações por tenant
+  CREATE TABLE IF NOT EXISTS tenant_config (
+    tenant_id TEXT PRIMARY KEY,
+    provider TEXT DEFAULT 'openai',
+    openai_key TEXT,
+    gemini_key TEXT,
+    model TEXT DEFAULT 'gpt-4.1-mini',
+    system_prompt TEXT DEFAULT '',
+    knowledge_base TEXT DEFAULT '',
+    delay_min INTEGER DEFAULT 2000,
+    delay_max INTEGER DEFAULT 5000,
+    ai_enabled INTEGER DEFAULT 1,
+    bot_active INTEGER DEFAULT 1,
+    temperature REAL DEFAULT 0.7,
+    top_p REAL DEFAULT 1.0,
+    response_format TEXT DEFAULT 'text',
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  );
+
+  -- Instâncias WhatsApp por tenant
+  CREATE TABLE IF NOT EXISTS whatsapp_instances (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    label TEXT DEFAULT 'Principal',
+    status TEXT DEFAULT 'disconnected',
+    phone TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  );
+
+  -- Histórico de conversas por tenant + número
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  );
+
+  -- Usuários do dashboard
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'admin',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`)
+
+export default db

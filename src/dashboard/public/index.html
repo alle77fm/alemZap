@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp AI — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+
+  /* Login */
+  .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 40px; width: 100%; max-width: 360px; }
+  .login-box h1 { font-size: 20px; margin-bottom: 8px; }
+  .login-box p { color: #888; font-size: 14px; margin-bottom: 28px; }
+
+  /* Layout */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; background: #141414; border-right: 1px solid #2a2a2a; padding: 20px 0; flex-shrink: 0; position: relative; display: flex; flex-direction: column; }
+  .sidebar .logo { padding: 0 20px 24px; font-weight: 600; font-size: 15px; border-bottom: 1px solid #2a2a2a; margin-bottom: 12px; }
+  .sidebar .logo span { color: #25d366; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: 14px; color: #aaa; transition: all .15s; border-radius: 0; }
+  .nav-item:hover, .nav-item.active { background: #1f1f1f; color: #fff; }
+  .nav-item.active { border-left: 2px solid #25d366; }
+  .content { flex: 1; padding: 32px; overflow-y: auto; }
+
+  /* Cards & forms */
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 20px; font-weight: 600; margin-bottom: 24px; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+  .card h3 { font-size: 15px; margin-bottom: 16px; color: #ccc; }
+  label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input, select, textarea { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px 14px; color: #e0e0e0; font-size: 14px; font-family: inherit; outline: none; transition: border .15s; }
+  input:focus, select:focus, textarea:focus { border-color: #25d366; }
+  textarea { resize: vertical; min-height: 120px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: #25d366; color: #000; }
+  .btn-secondary { background: #2a2a2a; color: #ccc; }
+  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+  .mt { margin-top: 16px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+  /* Status badge */
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge-green { background: #0d3320; color: #25d366; }
+  .badge-yellow { background: #2d2200; color: #f0a500; }
+  .badge-gray { background: #222; color: #888; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 14px; font-size: 12px; color: #666; border-bottom: 1px solid #2a2a2a; }
+  td { padding: 12px 14px; border-bottom: 1px solid #1f1f1f; }
+  tr:hover td { background: #1f1f1f; }
+
+  /* Chat history */
+  .chat-list { display: flex; flex-direction: column; gap: 8px; }
+  .bubble { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+  .bubble.user { background: #1f2f1f; align-self: flex-start; }
+  .bubble.assistant { background: #1a2a3a; align-self: flex-end; }
+  .bubble .meta { font-size: 11px; color: #666; margin-top: 4px; }
+
+  /* QR */
+  #qr-img { width: 220px; height: 220px; border-radius: 8px; margin: 16px 0; display: none; }
+  .toggle { position: relative; width: 44px; height: 24px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #333; border-radius: 24px; transition: .2s; cursor: pointer; }
+  .slider:before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #888; border-radius: 50%; transition: .2s; }
+  input:checked + .slider { background: #25d366; }
+  input:checked + .slider:before { transform: translateX(20px); background: #fff; }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+  .alert-success { background: #0d3320; color: #25d366; border: 1px solid #1a5c38; }
+  .alert-error { background: #2d0d0d; color: #e74c3c; border: 1px solid #5c1a1a; }
+  /* Tooltip Premium */
+  .tooltip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid #444; border-radius: 50%; cursor: help; font-size: 10px; color: #777; margin-left: 6px; font-weight: bold; transition: all .2s; }
+  .tooltip:hover { border-color: #25d366; color: #25d366; background: rgba(37, 211, 102, 0.05); }
+  .tooltip::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 140%;
+    left: 0;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    width: 220px;
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    opacity: 0;
+    visibility: hidden;
+    transition: all .2s;
+  }
+  .tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  /* Toasts e Loading */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 10000; }
+  .toast { padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease; }
+  .toast.success { background: #25d366; color: #000; }
+  .toast.error { background: #e74c3c; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Mobile Responsive */
+  .menu-btn { display: none; background: none; border: none; color: #ccc; font-size: 24px; cursor: pointer; padding: 10px; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 998; }
+  .app-header { display: none; padding: 10px 16px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; align-items: center; justify-content: space-between; }
+  
+  @media (max-width: 768px) {
+    .sidebar { position: fixed; left: -240px; top: 0; bottom: 0; width: 240px; z-index: 999; transition: left 0.3s ease; }
+    .sidebar.open { left: 0; }
+    .overlay.open { display: block; }
+    .app-header { display: flex; }
+    .content { padding: 16px; margin-top: 0; height: calc(100vh - 55px); }
+    .row { flex-direction: column; align-items: stretch; }
+    .btn { min-height: 44px; justify-content: center; }
+    input, select, textarea { font-size: 16px; } /* Evita zoom iOS */
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+    #page-playground .row-playground { flex-direction: column !important; height: auto !important; }
+    #page-playground .card { width: 100% !important; max-height: none !important; }
+    #page-history > div { flex-direction: column; }
+    #page-history .card { width: 100% !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-box">
+    <h1>WhatsApp <span style="color:#25d366">AI</span></h1>
+    <p>Dashboard de gerenciamento</p>
+    <div id="login-alert"></div>
+    <label>Email</label>
+    <input type="email" id="login-email" placeholder="admin@empresa.com" />
+    <label>Senha</label>
+    <input type="password" id="login-password" placeholder="••••••••" />
+    <button class="btn btn-primary mt" id="btn-login" style="width:100%" onclick="login()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-header">
+  <div style="font-weight:600">WhatsApp <span style="color:#25d366">AI</span></div>
+  <button class="menu-btn" onclick="toggleMenu()">☰</button>
+</div>
+
+<div class="overlay" onclick="toggleMenu()"></div>
+
+<div class="app" id="app-screen" style="display:none">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">WhatsApp <span>AI</span></div>
+    <div class="nav-item" id="bot-toggle-btn" onclick="toggleBotState()" style="font-weight:600; justify-content: center; margin-bottom: 8px; border: 1px solid #333; border-radius: 8px; margin-inline: 16px; padding: 8px;">
+      <span id="bot-toggle-text" style="color:#25d366">[ ● ON ] Bot ativo</span>
+    </div>
+    <div class="nav-item active" onclick="navigate('instances')">📱 Instâncias</div>
+    <div class="nav-item" onclick="navigate('config')">⚙️ Configurações</div>
+    <div class="nav-item" onclick="navigate('playground')">🧪 Playground</div>
+    <div class="nav-item" onclick="navigate('history')">💬 Histórico</div>
+    <div class="nav-item" onclick="navigate('tenants')">🏢 Tenants</div>
+    <div style="margin-top:auto;padding:0 20px">
+      <button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- INSTÂNCIAS -->
+    <div class="page active" id="page-instances">
+      <div class="page-title">Instâncias WhatsApp</div>
+      <div class="card">
+        <div class="row" style="margin-bottom:16px">
+          <input id="instance-label" placeholder="Nome da instância (ex: Vendas)" style="max-width:260px" />
+          <button class="btn btn-primary btn-sm" onclick="createInstance()">+ Adicionar</button>
+        </div>
+        <table>
+          <thead><tr><th>Instância</th><th>Número</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="instances-table"></tbody>
+        </table>
+      </div>
+
+
+      <!-- MODAL DE CONEXÃO -->
+      <div id="connect-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center">
+        <div style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:16px;padding:28px;width:420px;max-width:95vw;position:relative">
+          <button onclick="closeConnectModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#888;font-size:20px;cursor:pointer">✕</button>
+          <h3 style="margin:0 0 4px">Conectar WhatsApp</h3>
+          <p style="color:#888;font-size:13px;margin:0 0 20px">Escolha como deseja conectar esta instância:</p>
+
+          <!-- Abas -->
+          <div style="display:flex;gap:8px;margin-bottom:20px">
+            <button id="tab-qr" class="btn btn-primary" style="flex:1" onclick="switchConnectTab('qr')">📷 QR Code</button>
+            <button id="tab-phone" class="btn btn-secondary" style="flex:1" onclick="switchConnectTab('phone')">📱 Via Número</button>
+          </div>
+
+          <!-- Painel QR -->
+          <div id="panel-qr">
+            <p style="font-size:13px;color:#aaa;margin:0 0 14px">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo → Escaneie o QR Code</p>
+            <div id="qr-wrap" style="text-align:center;min-height:80px">
+              <img id="qr-img" style="max-width:260px;border-radius:8px;display:none" />
+              <div id="qr-spinner" style="color:#888;font-size:13px;padding:20px">⏳ Aguardando QR Code...</div>
+            </div>
+            <div id="qr-status" style="font-size:13px;color:#888;text-align:center;margin-top:10px"></div>
+          </div>
+
+          <!-- Painel Número -->
+          <div id="panel-phone" style="display:none">
+            <div style="background:#1a2a1a;border:1px solid #25d366;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#25d366">
+              ℹ️ Aguarde ~3 segundos após abrir este modal antes de gerar o código (o socket precisa iniciar).
+            </div>
+            <p style="font-size:13px;color:#aaa;margin:0 0 14px">Digite o número com DDI+DDD, sem espaços ou símbolos. Ex: <code style="color:#25d366">5511999999999</code></p>
+            <div style="display:flex;gap:8px">
+              <input id="pairing-phone" type="tel" placeholder="5511999999999" style="flex:1" />
+              <button id="btn-gen-code" class="btn btn-primary" onclick="requestPairingCode()">Gerar código</button>
+            </div>
+            <div id="pairing-result" style="display:none;margin-top:20px;text-align:center">
+              <p style="font-size:13px;color:#aaa;margin:0 0 8px">Digite este código no WhatsApp:</p>
+              <div id="pairing-code-display" style="font-size:36px;font-weight:800;letter-spacing:6px;color:#25d366;background:#0a2a1a;border-radius:10px;padding:16px"></div>
+              <p style="font-size:12px;color:#666;margin:10px 0 0">WhatsApp → Dispositivos conectados → Conectar com número de telefone</p>
+            </div>
+            <div id="pairing-error" style="color:#e74c3c;font-size:13px;margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES -->
+    <div class="page" id="page-config">
+      <div class="page-title">Configurações de IA</div>
+      <div class="card">
+        <h3>Provider de IA</h3>
+        <label>Provider</label>
+        <select id="cfg-provider" onchange="toggleProviderFields()">
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+        <div id="openai-fields">
+          <label>OpenAI API Key</label>
+          <input type="password" id="cfg-openai-key" placeholder="sk-..." />
+          <label>Modelo</label>
+          <select id="cfg-model">
+            <option value="gpt-4.1-mini">gpt-4.1-mini (recomendado — menor custo)</option>
+            <option value="gpt-4.1">gpt-4.1</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+          </select>
+        </div>
+        <div id="gemini-fields" style="display:none">
+          <label>Gemini API Key</label>
+          <input type="password" id="cfg-gemini-key" placeholder="AIza..." />
+          <label>Modelo</label>
+          <select id="cfg-model-gemini">
+            <option value="gemini-2.0-flash">gemini-2.0-flash (recomendado)</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Comportamento</h3>
+        <div class="row">
+          <span style="font-size:14px">IA ativada</span>
+          <label class="toggle">
+            <input type="checkbox" id="cfg-ai-enabled" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <label>Delay mínimo (ms)</label>
+        <input type="number" id="cfg-delay-min" value="2000" />
+        <label>Delay máximo (ms)</label>
+        <input type="number" id="cfg-delay-max" value="5000" />
+      <button class="btn btn-primary" onclick="saveConfig()">Salvar configurações</button>
+    </div>
+  </div>
+
+  <!-- PLAYGROUND -->
+    <div class="page" id="page-playground">
+      <div class="page-title">Playground de Testes</div>
+      <div style="display:flex;gap:20px;height:calc(100vh - 120px)" class="row-playground">
+        <!-- Painel Esquerdo: 32% -->
+        <div class="card" style="width:32%;display:flex;flex-direction:column;gap:12px;overflow-y:auto;margin-bottom:0">
+          <h3 style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: #555; border-bottom: 1px solid #2a2a2a; padding-bottom: 8px; margin-bottom: 8px;">Configuração do Modelo</h3>
+
+          <div style="margin-bottom: 10px;">
+            <label style="margin-top: 0;">Formato de resposta</label>
+            <select id="play-format">
+              <option value="text">Texto</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <label style="margin:0">Temperatura <span class="tooltip" data-tip="Controla a aleatoriedade. Temperaturas mais baixas resultam em menor aleatoriedade na geração de dados. À medida que a temperatura se aproxima de zero, o modelo torna-se determinístico e repetitivo.">i</span></label>
+              <span id="val-play-temp" style="font-size:13px; color:#25d366">0.70</span>
+            </div>
+            <input type="range" id="play-temp" min="0" max="2" step="0.01" value="0.7" oninput="document.getElementById('val-play-temp').innerText = parseFloat(this.value).toFixed(2)" />
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <label style="margin:0">Top P <span class="tooltip" data-tip="Controla a diversidade de palavras por meio de amostragem de núcleo. Um valor maior de top_p significa que o modelo analisa mais palavras possíveis, tornando a saída mais diversificada.">i</span></label>
+              <span id="val-play-topp" style="font-size:13px; color:#25d366">1.00</span>
+            </div>
+            <input type="range" id="play-topp" min="0" max="1" step="0.01" value="1.0" oninput="document.getElementById('val-play-topp').innerText = parseFloat(this.value).toFixed(2)" />
+          </div>
+
+          <h3 style="text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: #555; border-bottom: 1px solid #2a2a2a; padding-bottom: 8px; margin-bottom: 8px; margin-top: 10px;">Contexto</h3>
+          
+          <label style="margin-top:0">System Prompt</label>
+          <textarea id="play-system" rows="6"></textarea>
+          
+          <label>Knowledge Base (RAG)</label>
+          <textarea id="play-knowledge" rows="6"></textarea>
+          
+          <div style="display:flex;gap:10px;align-items:center;margin-top:4px">
+            <input type="file" id="play-file" accept=".pdf,.txt" style="display:none" onchange="uploadKnowledge()" />
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('play-file').click()">📎 Subir PDF ou TXT</button>
+          </div>
+          <div id="play-upload-msg" style="font-size:12px;color:#25d366"></div>
+          
+          <button class="btn btn-primary" id="btn-save-play" style="margin-top:20px" onclick="savePlaygroundConfig()">Salvar e aplicar</button>
+        </div>
+
+        <!-- Painel Direito: 70% -->
+        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:0;margin-bottom:0;overflow:hidden">
+          <div style="padding:16px;border-bottom:1px solid #2a2a2a;display:flex;justify-content:space-between;align-items:center">
+            <h3>Chat de Teste</h3>
+            <button class="btn btn-danger btn-sm" onclick="clearPlayground()">Limpar conversa</button>
+          </div>
+          <div id="play-chat" class="chat-list" style="flex:1;padding:16px;overflow-y:auto;background:#141414">
+            <div style="color:#666;font-size:13px;text-align:center;margin-top:20px">Inicie a conversa simulando o cliente.</div>
+          </div>
+          <div style="padding:16px;border-top:1px solid #2a2a2a;background:#1a1a1a;display:flex;gap:10px">
+            <input type="text" id="play-input" placeholder="Digite uma mensagem..." onkeypress="if(event.key==='Enter') sendPlaygroundMsg()" style="flex:1" />
+            <button class="btn btn-primary" id="btn-send-play" onclick="sendPlaygroundMsg()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="page" id="page-history">
+      <div class="page-title">Histórico de Conversas</div>
+      <div style="display:flex;gap:16px">
+        <div class="card" style="width:280px;flex-shrink:0;padding:0;overflow:hidden">
+          <div style="padding:16px;border-bottom:1px solid #2a2a2a;font-size:14px;color:#888">Contatos</div>
+          <div id="contact-list" style="max-height:600px;overflow-y:auto"></div>
+        </div>
+        <div class="card" style="flex:1">
+          <div id="chat-view" class="chat-list" style="min-height:400px">
+            <p style="color:#555;font-size:14px;text-align:center;margin-top:80px">Selecione um contato</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TENANTS -->
+    <div class="page" id="page-tenants">
+      <div class="page-title">Tenants (Clientes)</div>
+      <div class="card">
+        <h3>Novo Tenant</h3>
+        <div class="row">
+          <input id="t-id" placeholder="ID único (ex: pizzaria-joao)" style="flex:1" />
+          <input id="t-name" placeholder="Nome do cliente" style="flex:1" />
+          <input id="t-email" placeholder="Email" style="flex:1" />
+          <button class="btn btn-primary btn-sm" onclick="createTenant()">+ Criar</button>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Nome</th><th>Email</th><th>Status</th><th>Criado em</th></tr></thead>
+          <tbody id="tenants-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<script>
+let token = localStorage.getItem('token')
+let currentTenant = localStorage.getItem('tenant') || 'default'
+
+// UI Utilities
+function toggleMenu() {
+  document.getElementById('sidebar').classList.toggle('open')
+  document.querySelector('.overlay').classList.toggle('open')
+}
+
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container')
+  const toast = document.createElement('div')
+  toast.className = `toast ${type}`
+  toast.textContent = msg
+  container.appendChild(toast)
+  setTimeout(() => {
+    toast.style.animation = 'slideIn 0.3s ease reverse forwards'
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
+}
+
+function setLoading(btnId, isLoading, defaultText) {
+  const btn = document.getElementById(btnId)
+  if (!btn) return
+  if (isLoading) {
+    btn.disabled = true
+    btn.textContent = 'Carregando...'
+  } else {
+    btn.disabled = false
+    btn.textContent = defaultText
+  }
+}
+
+if (token) showApp()
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (res.status === 401) { logout(); return }
+  return res.json()
+}
+
+async function login() {
+  const email = document.getElementById('login-email').value
+  const password = document.getElementById('login-password').value
+  setLoading('btn-login', true)
+  try {
+    const data = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }).then(r => r.json())
+
+    if (data.token) {
+      token = data.token
+      localStorage.setItem('token', token)
+      showApp()
+    } else {
+      document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${data.error}</div>`
+    }
+  } catch (err) {
+    showToast('Erro de conexão', 'error')
+  } finally {
+    setLoading('btn-login', false, 'Entrar')
+  }
+}
+
+async function toggleBotState() {
+  try {
+    const data = await api('POST', `/api/config/${currentTenant}/toggle-bot`)
+    updateBotToggleUI(data.bot_active)
+    showToast(data.bot_active ? 'Bot ativado!' : 'Bot pausado!', data.bot_active ? 'success' : 'error')
+  } catch (err) {
+    showToast('Erro ao alterar status do bot', 'error')
+  }
+}
+
+function updateBotToggleUI(isActive) {
+  const textEl = document.getElementById('bot-toggle-text')
+  if (isActive) {
+    textEl.style.color = '#25d366'
+    textEl.textContent = '[ ● ON ] Bot ativo'
+  } else {
+    textEl.style.color = '#e74c3c'
+    textEl.textContent = '[ OFF ● ] Bot pausado'
+  }
+}
+
+function logout() {
+  localStorage.removeItem('token')
+  token = null
+  document.getElementById('login-screen').style.display = 'flex'
+  document.getElementById('app-screen').style.display = 'none'
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app-screen').style.display = 'flex'
+  navigate('instances')
+}
+
+function navigate(page) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
+  const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(el => el.getAttribute('onclick')?.includes(`navigate('${page}')`))
+  if (activeNav) activeNav.classList.add('active')
+  
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'))
+  document.getElementById(`page-${page}`).classList.add('active')
+  
+  if (page === 'instances') loadInstances()
+  if (page === 'config') {
+    loadConfig()
+    // ensure bot toggle is loaded correctly based on current config
+  }
+  if (page === 'playground') loadPlayground()
+  if (page === 'history') loadHistory()
+  if (page === 'tenants') loadTenants()
+}
+
+// ── Instances ────────────────────────────────────────────────────────────────
+
+async function loadInstances() {
+  const data = await api('GET', `/api/instances/${currentTenant}`)
+  const tbody = document.getElementById('instances-table')
+  tbody.innerHTML = data.map(i => `
+    <tr>
+      <td><div style="font-weight:600;color:#efefef">${i.label}</div></td>
+      <td><span style="font-family:monospace;color:#888">${i.phone || '—'}</span></td>
+      <td><span class="badge ${i.status === 'connected' ? 'badge-green' : i.status === 'qr_pending' ? 'badge-yellow' : 'badge-gray'}">${i.status}</span></td>
+      <td>
+        <div class="row" style="gap:8px">
+          <button id="btn-connect-${i.id}" class="btn btn-primary btn-sm" onclick="connectInstance('${i.id}')" title="Conectar ao WhatsApp">
+            📲 Conectar
+          </button>
+          ${i.status === 'connected' ? `
+            <button id="btn-disconnect-${i.id}" class="btn btn-secondary btn-sm" onclick="disconnectInstance('${i.id}')" title="Deslogar">
+              🚫 Sair
+            </button>
+          ` : ''}
+          <button class="btn btn-danger btn-sm" onclick="deleteInstance('${i.id}')" style="padding: 6px 10px;" title="Remover instância">
+            🗑️
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="color:#555;text-align:center">Nenhuma instância</td></tr>'
+}
+
+async function deleteInstance(instanceId) {
+  if (!confirm('Tem certeza que deseja deletar esta instância? Esta ação é irreversível e removerá todos os dados de conexão.')) return
+  try {
+    await api('DELETE', `/api/instances/${instanceId}`)
+    showToast('Instância removida com sucesso', 'success')
+    loadInstances()
+  } catch (err) {
+    showToast('Erro ao remover instância', 'error')
+  }
+}
+
+async function createInstance() {
+  const label = document.getElementById('instance-label').value || 'Principal'
+  await api('POST', `/api/instances/${currentTenant}`, { label })
+  document.getElementById('instance-label').value = ''
+  loadInstances()
+}
+
+// ── Connect Modal ─────────────────────────────────────────────────────────────
+
+let activeInstanceId = null
+let activeEventSource = null
+
+function connectInstance(instanceId) {
+  activeInstanceId = instanceId
+
+  // Fecha SSE anterior se houver
+  if (activeEventSource) {
+    activeEventSource.close()
+    activeEventSource = null
+  }
+
+  // Abre o modal
+  const modal = document.getElementById('connect-modal')
+  modal.style.display = 'flex'
+
+  // Reseta estado do painel QR
+  const img = document.getElementById('qr-img')
+  img.style.display = 'none'
+  img.src = ''
+  document.getElementById('qr-spinner').style.display = 'block'
+  document.getElementById('qr-spinner').textContent = '⏳ Aguardando QR Code...'
+  document.getElementById('qr-status').textContent = ''
+  document.getElementById('pairing-phone').value = ''
+  document.getElementById('pairing-result').style.display = 'none'
+  document.getElementById('pairing-error').textContent = ''
+
+  // Começa na aba QR e inicia stream
+  switchConnectTab('qr')
+  startQRStream(instanceId)
+}
+
+function startQRStream(instanceId) {
+  const es = new EventSource(`/api/instances/${instanceId}/connect?token=${token}`)
+  activeEventSource = es
+
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data)
+      if (data.type === 'qr') {
+        const img = document.getElementById('qr-img')
+        document.getElementById('qr-spinner').style.display = 'none'
+        img.src = data.qr
+        img.style.display = 'block'
+        document.getElementById('qr-status').textContent = 'Escaneie o QR Code com o WhatsApp'
+      }
+      if (data.type === 'connected') {
+        es.close()
+        activeEventSource = null
+        document.getElementById('qr-status').textContent = '✅ Conectado com sucesso!'
+        document.getElementById('qr-spinner').style.display = 'none'
+        setTimeout(() => { closeConnectModal(); loadInstances() }, 1500)
+      }
+    } catch(err) {}
+  }
+
+  es.onerror = () => {
+    // SSE fecha normalmente quando o servidor encerra o stream — não é erro fatal
+  }
+}
+
+function closeConnectModal() {
+  document.getElementById('connect-modal').style.display = 'none'
+  if (activeEventSource) {
+    activeEventSource.close()
+    activeEventSource = null
+  }
+}
+
+function switchConnectTab(tab) {
+  document.getElementById('panel-qr').style.display = tab === 'qr' ? 'block' : 'none'
+  document.getElementById('panel-phone').style.display = tab === 'phone' ? 'block' : 'none'
+  document.getElementById('tab-qr').className = tab === 'qr' ? 'btn btn-primary' : 'btn btn-secondary'
+  document.getElementById('tab-phone').className = tab === 'phone' ? 'btn btn-primary' : 'btn btn-secondary'
+  document.getElementById('tab-qr').style.flex = '1'
+  document.getElementById('tab-phone').style.flex = '1'
+}
+
+async function requestPairingCode() {
+  const phone = document.getElementById('pairing-phone').value.replace(/\D/g, '')
+  document.getElementById('pairing-error').textContent = ''
+  if (!phone || phone.length < 10) {
+    document.getElementById('pairing-error').textContent = 'Informe um número válido (ex: 5511999999999)'
+    return
+  }
+  setLoading('btn-gen-code', true)
+  try {
+    const data = await api('POST', `/api/instances/${activeInstanceId}/pairing-code`, { phone })
+    if (data.code) {
+      document.getElementById('pairing-code-display').textContent = data.code
+      document.getElementById('pairing-result').style.display = 'block'
+    } else {
+      document.getElementById('pairing-error').textContent = data.error || 'Erro ao gerar código'
+    }
+  } catch(err) {
+    document.getElementById('pairing-error').textContent = 'Erro de conexão'
+  } finally {
+    setLoading('btn-gen-code', false, 'Gerar código')
+  }
+}
+
+async function disconnectInstance(instanceId) {
+  setLoading(`btn-disconnect-${instanceId}`, true)
+  try {
+    await api('POST', `/api/instances/${instanceId}/disconnect`)
+    loadInstances()
+  } catch(e) {
+    showToast('Erro ao desconectar', 'error')
+  } finally {
+    setLoading(`btn-disconnect-${instanceId}`, false, 'Desconectar')
+  }
+}
+
+// ── Config ───────────────────────────────────────────────────────────────────
+
+async function loadConfig() {
+  const data = await api('GET', `/api/config/${currentTenant}`)
+  document.getElementById('cfg-provider').value = data.provider || 'openai'
+  document.getElementById('cfg-model').value = data.model || 'gpt-4.1-mini'
+  document.getElementById('cfg-delay-min').value = data.delay_min || 2000
+  document.getElementById('cfg-delay-max').value = data.delay_max || 5000
+  document.getElementById('cfg-ai-enabled').checked = data.ai_enabled === 1
+  toggleProviderFields()
+  updateBotToggleUI(data.bot_active ?? 1)
+}
+
+function toggleProviderFields() {
+  const p = document.getElementById('cfg-provider').value
+  document.getElementById('openai-fields').style.display = p === 'openai' ? 'block' : 'none'
+  document.getElementById('gemini-fields').style.display = p === 'gemini' ? 'block' : 'none'
+}
+
+async function saveConfig() {
+  const provider = document.getElementById('cfg-provider').value
+  const body = {
+    provider,
+    model: provider === 'gemini'
+      ? document.getElementById('cfg-model-gemini').value
+      : document.getElementById('cfg-model').value,
+    delay_min: parseInt(document.getElementById('cfg-delay-min').value),
+    delay_max: parseInt(document.getElementById('cfg-delay-max').value),
+    ai_enabled: document.getElementById('cfg-ai-enabled').checked ? 1 : 0,
+  }
+  const keyOpenai = document.getElementById('cfg-openai-key').value
+  const keyGemini = document.getElementById('cfg-gemini-key').value
+  if (keyOpenai && !keyOpenai.startsWith('••')) body.openai_key = keyOpenai
+  if (keyGemini && !keyGemini.startsWith('••')) body.gemini_key = keyGemini
+
+  setLoading('btn-save-cfg', true)
+  try {
+    await api('POST', `/api/config/${currentTenant}`, body)
+    showToast('Configurações salvas!', 'success')
+  } catch (err) {
+    showToast('Erro ao salvar configurações', 'error')
+  } finally {
+    setLoading('btn-save-cfg', false, 'Salvar configurações')
+  }
+}
+
+
+
+// ── Playground ───────────────────────────────────────────────────────────────
+
+let playHistory = []
+
+async function loadPlayground() {
+  const data = await api('GET', `/api/config/${currentTenant}`)
+  document.getElementById('play-system').value = data.system_prompt || ''
+  document.getElementById('play-knowledge').value = data.knowledge_base || ''
+  
+  const temp = data.temperature ?? 0.7
+  document.getElementById('play-temp').value = temp
+  document.getElementById('val-play-temp').innerText = parseFloat(temp).toFixed(2)
+  
+  const topp = data.top_p ?? 1.0
+  document.getElementById('play-topp').value = topp
+  document.getElementById('val-play-topp').innerText = parseFloat(topp).toFixed(2)
+  
+  document.getElementById('play-format').value = data.response_format || 'text'
+  
+  playHistory = []
+  renderPlaygroundChat()
+}
+
+async function savePlaygroundConfig() {
+  setLoading('btn-save-play', true)
+  try {
+    await api('POST', `/api/config/${currentTenant}`, {
+      system_prompt: document.getElementById('play-system').value,
+      knowledge_base: document.getElementById('play-knowledge').value,
+      temperature: parseFloat(document.getElementById('play-temp').value),
+      top_p: parseFloat(document.getElementById('play-topp').value),
+      response_format: document.getElementById('play-format').value
+    })
+    showToast('Prompt e configurações atualizados!', 'success')
+  } catch (err) {
+    showToast('Erro ao atualizar configurações', 'error')
+  } finally {
+    setLoading('btn-save-play', false, 'Salvar e aplicar')
+  }
+}
+
+async function uploadKnowledge() {
+  const fileInput = document.getElementById('play-file')
+  if (!fileInput.files.length) return
+  const file = fileInput.files[0]
+  const msgEl = document.getElementById('play-upload-msg')
+  
+  msgEl.textContent = 'Enviando e extraindo texto...'
+  msgEl.style.color = '#888'
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const res = await fetch(`/api/config/${currentTenant}/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    })
+    const data = await res.json()
+    if (data.ok) {
+      document.getElementById('play-knowledge').value = data.knowledge_base
+      showToast(`${data.chars} caracteres adicionados!`, 'success')
+    } else {
+      showToast(data.error || 'Erro no upload', 'error')
+    }
+  } catch (err) {
+    showToast('Falha de conexão no upload', 'error')
+  }
+  
+  fileInput.value = ''
+}
+
+function clearPlayground() {
+  playHistory = []
+  renderPlaygroundChat()
+}
+
+function renderPlaygroundChat() {
+  const chat = document.getElementById('play-chat')
+  if (!playHistory.length) {
+    chat.innerHTML = '<div style="color:#666;font-size:13px;text-align:center;margin-top:20px">Inicie a conversa simulando o cliente.</div>'
+    return
+  }
+  chat.innerHTML = playHistory.map(m => `
+    <div class="bubble ${m.role}">
+      ${m.content.replace(/\n/g, '<br>')}
+    </div>
+  `).join('')
+  chat.scrollTop = chat.scrollHeight
+}
+
+async function sendPlaygroundMsg() {
+  const input = document.getElementById('play-input')
+  const msg = input.value.trim()
+  if (!msg) return
+  
+  playHistory.push({ role: 'user', content: msg })
+  input.value = ''
+  renderPlaygroundChat()
+  
+  const chat = document.getElementById('play-chat')
+  chat.insertAdjacentHTML('beforeend', `<div id="typing" class="bubble assistant" style="color:#aaa;font-size:12px;font-style:italic">Digitando...</div>`)
+  chat.scrollTop = chat.scrollHeight
+
+  setLoading('btn-send-play', true)
+  try {
+    const res = await api('POST', `/api/playground/${currentTenant}`, {
+      message: msg,
+      history: playHistory.slice(0, -1),
+      temperature: parseFloat(document.getElementById('play-temp').value),
+      top_p: parseFloat(document.getElementById('play-topp').value),
+      response_format: document.getElementById('play-format').value
+    })
+    document.getElementById('typing')?.remove()
+    
+    if (res.reply) {
+      playHistory.push({ role: 'assistant', content: res.reply })
+    } else if (res.error) {
+      playHistory.push({ role: 'assistant', content: `[Erro]: ${res.error}` })
+    }
+  } catch (err) {
+    document.getElementById('typing')?.remove()
+    playHistory.push({ role: 'assistant', content: '[Erro de comunicação]' })
+  } finally {
+    setLoading('btn-send-play', false, 'Enviar')
+  }
+  
+  renderPlaygroundChat()
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+async function loadHistory() {
+  const data = await api('GET', `/api/conversations/${currentTenant}`)
+  const list = document.getElementById('contact-list')
+  list.innerHTML = data.map(c => `
+    <div onclick="loadChat('${c.instance_id}','${c.phone}')" style="padding:14px 16px;cursor:pointer;border-bottom:1px solid #1f1f1f;font-size:13px">
+      <div style="font-weight:500">+${c.phone}</div>
+      <div style="color:#666;font-size:12px;margin-top:2px">${c.total} mensagens</div>
+    </div>
+  `).join('') || '<p style="padding:16px;color:#555;font-size:13px">Sem conversas</p>'
+}
+
+async function loadChat(instanceId, phone) {
+  const data = await api('GET', `/api/conversations/${currentTenant}/${instanceId}/${phone}`)
+  const view = document.getElementById('chat-view')
+  view.innerHTML = data.map(m => `
+    <div class="bubble ${m.role}">
+      ${m.content}
+      <div class="meta">${new Date(m.created_at).toLocaleString('pt-BR')}</div>
+    </div>
+  `).join('')
+  view.scrollTop = view.scrollHeight
+}
+
+// ── Tenants ──────────────────────────────────────────────────────────────────
+
+async function loadTenants() {
+  const data = await api('GET', '/api/tenants')
+  const tbody = document.getElementById('tenants-table')
+  tbody.innerHTML = data.map(t => `
+    <tr>
+      <td><code style="font-size:12px;color:#888">${t.id}</code></td>
+      <td>${t.name}</td>
+      <td>${t.email}</td>
+      <td><span class="badge ${t.active ? 'badge-green' : 'badge-gray'}">${t.active ? 'ativo' : 'inativo'}</span></td>
+      <td style="color:#666;font-size:12px">${new Date(t.created_at).toLocaleDateString('pt-BR')}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="color:#555;text-align:center">Nenhum tenant</td></tr>'
+}
+
+async function createTenant() {
+  const id = document.getElementById('t-id').value
+  const name = document.getElementById('t-name').value
+  const email = document.getElementById('t-email').value
+  await api('POST', '/api/tenants', { id, name, email })
+  document.getElementById('t-id').value = ''
+  document.getElementById('t-name').value = ''
+  document.getElementById('t-email').value = ''
+  loadTenants()
+}
+</script>
+</body>
+</html>
