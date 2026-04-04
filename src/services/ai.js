@@ -1,5 +1,5 @@
 import * as openaiProvider from '../providers/openai.js'
-import * as geminiProvider from '../providers/gemini.js'
+import * as deepseekProvider from '../providers/deepseek.js'
 import { getConfig } from '../../config/settings.js'
 import { getHistory, saveMessage } from './memory.js'
 
@@ -8,8 +8,8 @@ export async function processMessage(tenantId, instanceId, phone, message) {
 
   if (!config.ai_enabled) return null
 
-  const apiKey = config.provider === 'gemini'
-    ? (config.gemini_key || process.env.GEMINI_API_KEY)
+  const apiKey = config.provider === 'deepseek'
+    ? (config.deepseek_key || process.env.DEEPSEEK_API_KEY)
     : (config.openai_key || process.env.OPENAI_API_KEY)
 
   if (!apiKey) throw new Error(`API key não configurada para provider: ${config.provider}`)
@@ -25,8 +25,8 @@ export async function processMessage(tenantId, instanceId, phone, message) {
     message,
   }
 
-  const reply = config.provider === 'gemini'
-    ? await geminiProvider.call(ctx)
+  const reply = config.provider === 'deepseek'
+    ? await deepseekProvider.call(ctx)
     : await openaiProvider.call(ctx)
 
   // Salva interação

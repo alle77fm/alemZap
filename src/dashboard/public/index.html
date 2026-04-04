@@ -292,7 +292,7 @@
         <label>Provider</label>
         <select id="cfg-provider" onchange="toggleProviderFields()">
           <option value="openai">OpenAI</option>
-          <option value="gemini">Google Gemini</option>
+          <option value="deepseek">DeepSeek</option>
         </select>
         <div id="openai-fields">
           <label>OpenAI API Key</label>
@@ -305,14 +305,13 @@
             <option value="gpt-4o-mini">gpt-4o-mini</option>
           </select>
         </div>
-        <div id="gemini-fields" style="display:none">
-          <label>Gemini API Key</label>
-          <input type="password" id="cfg-gemini-key" placeholder="AIza..." />
+        <div id="deepseek-fields" style="display:none">
+          <label>DeepSeek API Key</label>
+          <input type="password" id="cfg-deepseek-key" placeholder="sk-..." />
           <label>Modelo</label>
-          <select id="cfg-model-gemini">
-            <option value="gemini-2.0-flash">gemini-2.0-flash (recomendado)</option>
-            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+          <select id="cfg-model-deepseek">
+            <option value="deepseek-chat">deepseek-chat (recomendado — menor custo)</option>
+            <option value="deepseek-reasoner">deepseek-reasoner</option>
           </select>
         </div>
       </div>
@@ -833,8 +832,8 @@ async function loadConfig() {
   const data = await api('GET', `/api/config/${currentTenant}`)
   document.getElementById('cfg-provider').value = data.provider || 'openai'
   // Carrega modelo correto por provider
-  if (data.provider === 'gemini') {
-    document.getElementById('cfg-model-gemini').value = data.model || 'gemini-2.0-flash'
+  if (data.provider === 'deepseek') {
+    document.getElementById('cfg-model-deepseek').value = data.model || 'deepseek-chat'
   } else {
     document.getElementById('cfg-model').value = data.model || 'gpt-4.1-mini'
   }
@@ -846,7 +845,7 @@ async function loadConfig() {
   document.getElementById('cfg-api-key').value = data.api_key || ''
   // Exibe keys mascaradas (ex: ••••1234) se existirem
   document.getElementById('cfg-openai-key').value = data.openai_key || ''
-  document.getElementById('cfg-gemini-key').value = data.gemini_key || ''
+  document.getElementById('cfg-deepseek-key').value = data.deepseek_key || ''
   toggleProviderFields()
   updateBotToggleUI(data.bot_active ?? 1)
 }
@@ -854,15 +853,15 @@ async function loadConfig() {
 function toggleProviderFields() {
   const p = document.getElementById('cfg-provider').value
   document.getElementById('openai-fields').style.display = p === 'openai' ? 'block' : 'none'
-  document.getElementById('gemini-fields').style.display = p === 'gemini' ? 'block' : 'none'
+  document.getElementById('deepseek-fields').style.display = p === 'deepseek' ? 'block' : 'none'
 }
 
 async function saveConfig() {
   const provider = document.getElementById('cfg-provider').value
   const body = {
     provider,
-    model: provider === 'gemini'
-      ? document.getElementById('cfg-model-gemini').value
+    model: provider === 'deepseek'
+      ? document.getElementById('cfg-model-deepseek').value
       : document.getElementById('cfg-model').value,
     delay_min: parseInt(document.getElementById('cfg-delay-min').value),
     delay_max: parseInt(document.getElementById('cfg-delay-max').value),
@@ -871,12 +870,12 @@ async function saveConfig() {
     webhook_url: document.getElementById('cfg-webhook-url').value.trim()
   }
   const keyOpenai = document.getElementById('cfg-openai-key').value.trim()
-  const keyGemini = document.getElementById('cfg-gemini-key').value.trim()
+  const keyDeepseek = document.getElementById('cfg-deepseek-key').value.trim()
 
   // Só envia a key se o usuário digitou uma nova (não começa com ••)
   // Aceita qualquer prefixo: sk-, sk-proj-, AIza..., etc.
   if (keyOpenai && !keyOpenai.startsWith('\u2022\u2022')) body.openai_key = keyOpenai
-  if (keyGemini && !keyGemini.startsWith('\u2022\u2022')) body.gemini_key = keyGemini
+  if (keyDeepseek && !keyDeepseek.startsWith('\u2022\u2022')) body.deepseek_key = keyDeepseek
 
   setLoading('btn-save-cfg', true)
   try {

@@ -15,7 +15,7 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 const pdf = require('pdf-parse')
 import * as openaiProvider from '../providers/openai.js'
-import * as geminiProvider from '../providers/gemini.js'
+import * as deepseekProvider from '../providers/deepseek.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -134,7 +134,7 @@ app.post('/api/playground/:tenantId', auth, async (req, res) => {
   try {
     const { message, history, temperature, top_p, response_format } = req.body
     const config = getConfig(req.params.tenantId)
-    const apiKey = config.provider === 'gemini' ? (config.gemini_key || process.env.GEMINI_API_KEY) : (config.openai_key || process.env.OPENAI_API_KEY)
+    const apiKey = config.provider === 'deepseek' ? (config.deepseek_key || process.env.DEEPSEEK_API_KEY) : (config.openai_key || process.env.OPENAI_API_KEY)
     
     if (!apiKey) return res.status(400).json({ error: 'API key não configurada no painel ou env.' })
 
@@ -150,7 +150,7 @@ app.post('/api/playground/:tenantId', auth, async (req, res) => {
       response_format: response_format ?? config.response_format ?? 'text'
     }
 
-    const reply = config.provider === 'gemini' ? await geminiProvider.call(ctx) : await openaiProvider.call(ctx)
+    const reply = config.provider === 'deepseek' ? await deepseekProvider.call(ctx) : await openaiProvider.call(ctx)
     res.json({ reply })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -188,7 +188,7 @@ app.get('/api/config/:tenantId', auth, (req, res) => {
   const config = getConfig(req.params.tenantId)
   // Não retorna as keys completas por segurança
   config.openai_key = config.openai_key ? '••••' + config.openai_key.slice(-4) : ''
-  config.gemini_key = config.gemini_key ? '••••' + config.gemini_key.slice(-4) : ''
+  config.deepseek_key = config.deepseek_key ? '••••' + config.deepseek_key.slice(-4) : ''
   res.json(config)
 })
 

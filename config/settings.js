@@ -15,6 +15,7 @@ const DEFAULTS = {
   webhook_url: '',
   webhook_enabled: 0,
   api_key: '',
+  deepseek_key: '',
 }
 
 export function getConfig(tenantId) {
@@ -27,15 +28,15 @@ export function saveConfig(tenantId, updates) {
   const merged = { ...current, ...updates, tenant_id: tenantId }
 
   db.prepare(`
-    INSERT INTO tenant_config (tenant_id, provider, openai_key, gemini_key, model,
+    INSERT INTO tenant_config (tenant_id, provider, openai_key, gemini_key, deepseek_key, model,
       system_prompt, knowledge_base, delay_min, delay_max, ai_enabled, bot_active,
       temperature, top_p, response_format, webhook_url, webhook_enabled, api_key)
-    VALUES (@tenant_id, @provider, @openai_key, @gemini_key, @model,
+    VALUES (@tenant_id, @provider, @openai_key, @gemini_key, @deepseek_key, @model,
       @system_prompt, @knowledge_base, @delay_min, @delay_max, @ai_enabled, @bot_active,
       @temperature, @top_p, @response_format, @webhook_url, @webhook_enabled, @api_key)
     ON CONFLICT(tenant_id) DO UPDATE SET
       provider=excluded.provider, openai_key=excluded.openai_key,
-      gemini_key=excluded.gemini_key, model=excluded.model,
+      gemini_key=excluded.gemini_key, deepseek_key=excluded.deepseek_key, model=excluded.model,
       system_prompt=excluded.system_prompt, knowledge_base=excluded.knowledge_base,
       delay_min=excluded.delay_min, delay_max=excluded.delay_max,
       ai_enabled=excluded.ai_enabled, bot_active=excluded.bot_active,
