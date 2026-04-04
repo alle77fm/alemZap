@@ -17,7 +17,6 @@ const instances = new Map() // instanceId → socket
 
 function getAuthDir(tenantId, instanceId) {
   const dir = path.resolve(`data/auth/${tenantId}/${instanceId}`)
-  // Não cria o diretório aqui — useMultiFileAuthState cuida disso
   return dir
 }
 
@@ -35,9 +34,7 @@ function updateStatus(instanceId, status, phone = null) {
 // Encerra um socket completamente, sem chance de reconexão interna
 function killSocket(sock) {
   try {
-    // Remove todos os listeners para evitar callbacks fantasma
     sock.ev.removeAllListeners()
-    // Encerra o websocket
     sock.end(new Error('force_close'))
   } catch (_) {
     try { sock.ws?.close() } catch (_2) {}
@@ -62,7 +59,6 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
   const { state, saveCreds } = await useMultiFileAuthState(authDir)
 
   // Pega versão do protocolo com timeout e fallback
-  // Versão confirmada funcional: [2, 3000, 1035194821]
   let version
   try {
     const result = await Promise.race([
@@ -82,9 +78,11 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
     logger,
     browser: ['Ubuntu', 'Chrome', '130.0.6723.117'],
     printQRInTerminal: false,
-    connectTimeoutMs: 60000,
-    keepAliveIntervalMs: 30000,
-    retryRequestDelayMs: 2000,
+    // ── Configurações de estabilidade para VPS ──────────────────────────────
+    connectTimeoutMs: 60000,      // aguarda até 60s para conectar
+    keepAliveIntervalMs: 10000,   // mantém conexão ativa a cada 10s
+    retryRequestDelayMs: 2000,    // espera 2s entre tentativas de requisição
+    qrTimeoutMs: 60000,           // QR Code válido por 60 segundos
     maxMsgRetryCount: 5,
   })
 
@@ -94,15 +92,16 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
   sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+    // ── QR Code gerado ──────────────────────────────────────────────────────
     if (qr) {
       console.log(`[${instanceId}] QR gerado (onEvent=${!!onEvent})`)
       updateStatus(instanceId, 'qr_pending')
       if (onEvent) {
         onEvent('qr', qr)
       }
-      // Não imprimir QR no terminal quando chamado pelo dashboard
     }
 
+    // ── Conexão aberta com sucesso ──────────────────────────────────────────
     if (connection === 'open') {
       const phone = sock.user?.id?.split(':')[0]
       updateStatus(instanceId, 'connected', phone)
@@ -110,30 +109,64 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
       if (onEvent) onEvent('connected')
     }
 
+    // ── Conexão encerrada ───────────────────────────────────────────────────
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
       const reason = lastDisconnect?.error?.message || 'desconhecido'
       console.log(`[${instanceId}] Conexão encerrada. Código: ${code}, Motivo: ${reason}`)
-      updateStatus(instanceId, 'disconnected')
-      instances.delete(instanceId)
 
-      const wasLoggedOut = code === DisconnectReason.loggedOut
-      const started_by_dashboard = !!onEvent
+      // ── CÓDIGO 515: Stream Error (reinicialização normal do Baileys) ──────
+      // NÃO deletar auth. Apenas reconectar após 3 segundos.
+      if (code === 515) {
+        console.log(`[${instanceId}] Stream error (515) — reconectando em 3s sem deletar auth...`)
+        instances.delete(instanceId)
+        updateStatus(instanceId, 'connecting')
+        setTimeout(() => startInstance(tenantId, instanceId, onEvent), 3000)
+        return
+      }
 
-      // 401 = sem credenciais válidas - excluir a pasta de autenticação
-      if (code === 401) {
-        console.log(`[${instanceId}] Credenciais inválidas (401), deletando auth...`)
+      // ── CÓDIGO 401 REAL: loggedOut (DisconnectReason.loggedOut = 401) ─────
+      // Só deleta auth quando for REALMENTE deslogado (ex: sessão revogada no celular).
+      if (code === DisconnectReason.loggedOut) {
+        console.log(`[${instanceId}] Sessão encerrada pelo WhatsApp (loggedOut 401) — deletando auth...`)
+        instances.delete(instanceId)
+        updateStatus(instanceId, 'disconnected')
         const dir = getAuthDir(tenantId, instanceId)
         if (fs.existsSync(dir)) {
           fs.rmSync(dir, { recursive: true, force: true })
         }
+        if (onEvent) onEvent('disconnected')
         return
       }
 
-      // Reconexão automática apenas para instâncias com credenciais salvas, não iniciadas pelo dashboard
+      // ── CÓDIGO 408: QR refs expirado — gerar novo QR automaticamente ─────
+      // Não exige clique em "Conectar" novamente. Reinicia o socket para novo QR.
+      if (code === 408) {
+        console.log(`[${instanceId}] QR expirado (408) — gerando novo QR automaticamente...`)
+        instances.delete(instanceId)
+        updateStatus(instanceId, 'qr_pending')
+        setTimeout(() => startInstance(tenantId, instanceId, onEvent), 2000)
+        return
+      }
+
+      // ── Connection Failure genérico (qualquer outro código) ───────────────
+      // Reconecta sem deletar credentials. Pode ser problema de rede, VPS, etc.
+      instances.delete(instanceId)
+      updateStatus(instanceId, 'disconnected')
+
+      const wasLoggedOut = code === DisconnectReason.loggedOut
+      const started_by_dashboard = !!onEvent
+
       if (!wasLoggedOut && !started_by_dashboard && hasCredentials(tenantId, instanceId)) {
-        console.log(`🔄 Reconectando instância ${instanceId} (tem credenciais)...`)
+        console.log(`🔄 Reconectando instância ${instanceId} em 5s (código ${code})...`)
         setTimeout(() => startInstance(tenantId, instanceId), 5000)
+      } else if (!wasLoggedOut && started_by_dashboard && hasCredentials(tenantId, instanceId)) {
+        // Iniciada pelo dashboard mas pode reconectar (falha de rede, ex: 503, 500)
+        console.log(`🔄 Reconectando instância dashboard ${instanceId} em 5s (código ${code})...`)
+        setTimeout(() => startInstance(tenantId, instanceId, onEvent), 5000)
+      } else {
+        console.log(`[${instanceId}] Sem reconexão automática. Código: ${code}`)
+        if (onEvent) onEvent('disconnected')
       }
     }
   })
@@ -189,8 +222,6 @@ export async function startAllInstances() {
   `).all()
 
   for (const row of rows) {
-    // Só inicia instâncias que já têm credenciais salvas (já conectaram antes)
-    // Instâncias novas aguardam o usuário clicar em "Conectar" no dashboard
     if (hasCredentials(row.tenant_id, row.id)) {
       console.log(`🚀 Iniciando instância ${row.id} (tenant: ${row.tenant_id})`)
       await startInstance(row.tenant_id, row.id)
