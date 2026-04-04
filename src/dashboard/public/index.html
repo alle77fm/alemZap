@@ -113,15 +113,38 @@
   .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   /* Mobile Responsive */
-  .menu-btn { display: none; background: none; border: none; color: #ccc; font-size: 24px; cursor: pointer; padding: 10px; }
+  .menu-btn { display: none; background: none; border: none; color: #ccc; font-size: 24px; cursor: pointer; padding: 10px; flex-shrink: 0; }
   .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 998; }
-  .app-header { display: none; padding: 10px 16px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; align-items: center; justify-content: space-between; }
-  
+  .app-header { display: none; padding: 8px 12px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; align-items: center; justify-content: space-between; gap: 8px; }
+  .app-header .logo-text { font-weight: 600; font-size: 14px; flex-shrink: 0; }
+
+  /* Botão Bot Ativo no header mobile */
+  #header-bot-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #25d366;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all .2s;
+  }
+  #header-bot-btn:hover { background: rgba(37,211,102,0.08); }
+  #header-bot-btn.off { color: #e74c3c; border-color: #5c1a1a; }
+  #header-bot-btn.off:hover { background: rgba(231,76,60,0.08); }
+
   @media (max-width: 768px) {
     .sidebar { position: fixed; left: -240px; top: 0; bottom: 0; width: 240px; z-index: 999; transition: left 0.3s ease; }
     .sidebar.open { left: 0; }
     .overlay.open { display: block; }
     .app-header { display: flex; }
+    #header-bot-btn { display: inline-flex; }
     .content { padding: 16px; margin-top: 0; height: calc(100vh - 55px); }
     .row { flex-direction: column; align-items: stretch; }
     .btn { min-height: 44px; justify-content: center; }
@@ -151,8 +174,12 @@
 </div>
 
 <!-- APP -->
-<div class="app-header">
-  <div style="font-weight:600">WhatsApp <span style="color:#25d366">AI</span></div>
+<div class="app-header" id="app-header">
+  <div class="logo-text">WhatsApp <span style="color:#25d366">AI</span></div>
+  <button id="header-bot-btn" onclick="toggleBotState()" title="Ativar/Pausar Bot">
+    <span id="header-bot-icon">●</span>
+    <span id="header-bot-label">Bot ON</span>
+  </button>
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
@@ -473,6 +500,7 @@ async function toggleBotState() {
 }
 
 function updateBotToggleUI(isActive) {
+  // Sidebar (desktop)
   const textEl = document.getElementById('bot-toggle-text')
   if (isActive) {
     textEl.style.color = '#25d366'
@@ -480,6 +508,17 @@ function updateBotToggleUI(isActive) {
   } else {
     textEl.style.color = '#e74c3c'
     textEl.textContent = '[ OFF ● ] Bot pausado'
+  }
+
+  // Header (mobile)
+  const headerBtn = document.getElementById('header-bot-btn')
+  const headerLabel = document.getElementById('header-bot-label')
+  if (isActive) {
+    headerBtn.classList.remove('off')
+    headerLabel.textContent = 'Bot ON'
+  } else {
+    headerBtn.classList.add('off')
+    headerLabel.textContent = 'Bot OFF'
   }
 }
 
