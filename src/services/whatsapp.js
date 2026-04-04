@@ -111,63 +111,48 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
 
     // ── Conexão encerrada ───────────────────────────────────────────────────
     if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode
-      const reason = lastDisconnect?.error?.message || 'desconhecido'
-      console.log(`[${instanceId}] Conexão encerrada. Código: ${code}, Motivo: ${reason}`)
+      const statusCode = lastDisconnect?.error?.output?.statusCode
+      const reason = lastDisconnect?.error?.message || ''
+      console.log(`[${instanceId}] Conexão encerrada. Código: ${statusCode}, Motivo: ${reason}`)
+
+      updateStatus(instanceId, 'disconnected')
+      instances.delete(instanceId)
 
       // ── CÓDIGO 515: Stream Error (reinicialização normal do Baileys) ──────
-      // NÃO deletar auth. Apenas reconectar após 3 segundos.
-      if (code === 515) {
+      // NÃO deletar auth. Reconectar após 3 segundos.
+      if (statusCode === 515) {
         console.log(`[${instanceId}] Stream error (515) — reconectando em 3s sem deletar auth...`)
-        instances.delete(instanceId)
         updateStatus(instanceId, 'connecting')
         setTimeout(() => startInstance(tenantId, instanceId, onEvent), 3000)
         return
       }
 
-      // ── CÓDIGO 401 REAL: loggedOut (DisconnectReason.loggedOut = 401) ─────
-      // Só deleta auth quando for REALMENTE deslogado (ex: sessão revogada no celular).
-      if (code === DisconnectReason.loggedOut) {
-        console.log(`[${instanceId}] Sessão encerrada pelo WhatsApp (loggedOut 401) — deletando auth...`)
-        instances.delete(instanceId)
-        updateStatus(instanceId, 'disconnected')
-        const dir = getAuthDir(tenantId, instanceId)
-        if (fs.existsSync(dir)) {
-          fs.rmSync(dir, { recursive: true, force: true })
-        }
-        if (onEvent) onEvent('disconnected')
-        return
-      }
-
-      // ── CÓDIGO 408: QR refs expirado — gerar novo QR automaticamente ─────
-      // Não exige clique em "Conectar" novamente. Reinicia o socket para novo QR.
-      if (code === 408) {
+      // ── CÓDIGO 408: QR expirado — gerar novo QR automaticamente ──────────
+      if (statusCode === 408) {
         console.log(`[${instanceId}] QR expirado (408) — gerando novo QR automaticamente...`)
-        instances.delete(instanceId)
         updateStatus(instanceId, 'qr_pending')
         setTimeout(() => startInstance(tenantId, instanceId, onEvent), 2000)
         return
       }
 
-      // ── Connection Failure genérico (qualquer outro código) ───────────────
-      // Reconecta sem deletar credentials. Pode ser problema de rede, VPS, etc.
-      instances.delete(instanceId)
-      updateStatus(instanceId, 'disconnected')
+      // ── LOGOUT REAL: detectado pela mensagem, não pelo código numérico ────
+      // DisconnectReason.loggedOut = 401, mas "Connection Failure" com código
+      // 401 é diferente. A forma segura é checar o texto da mensagem.
+      const isLoggedOut = reason.toLowerCase().includes('logged out')
 
-      const wasLoggedOut = code === DisconnectReason.loggedOut
-      const started_by_dashboard = !!onEvent
-
-      if (!wasLoggedOut && !started_by_dashboard && hasCredentials(tenantId, instanceId)) {
-        console.log(`🔄 Reconectando instância ${instanceId} em 5s (código ${code})...`)
-        setTimeout(() => startInstance(tenantId, instanceId), 5000)
-      } else if (!wasLoggedOut && started_by_dashboard && hasCredentials(tenantId, instanceId)) {
-        // Iniciada pelo dashboard mas pode reconectar (falha de rede, ex: 503, 500)
-        console.log(`🔄 Reconectando instância dashboard ${instanceId} em 5s (código ${code})...`)
-        setTimeout(() => startInstance(tenantId, instanceId, onEvent), 5000)
-      } else {
-        console.log(`[${instanceId}] Sem reconexão automática. Código: ${code}`)
+      if (isLoggedOut) {
+        console.log(`[${instanceId}] Desconectado pelo usuário — escaneie o QR novamente`)
+        const authDir = getAuthDir(tenantId, instanceId)
+        if (fs.existsSync(authDir)) {
+          fs.rmSync(authDir, { recursive: true, force: true })
+        }
         if (onEvent) onEvent('disconnected')
+        return
       }
+
+      // ── Qualquer outro erro: reconecta sem deletar auth ───────────────────
+      console.log(`[${instanceId}] Reconectando (código: ${statusCode})...`)
+      setTimeout(() => startInstance(tenantId, instanceId, onEvent), 3000)
     }
   })
 
