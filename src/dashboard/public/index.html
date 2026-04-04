@@ -113,9 +113,9 @@
   .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   /* Mobile Responsive */
-  .menu-btn { display: none; background: none; border: none; color: #ccc; font-size: 24px; cursor: pointer; padding: 10px; flex-shrink: 0; }
+  .menu-btn { display: none; background: none; border: none; color: #ccc; font-size: 24px; cursor: pointer; padding: 10px; flex-shrink: 0; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
   .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 998; }
-  .app-header { display: none; padding: 8px 12px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; align-items: center; justify-content: space-between; gap: 8px; }
+  .app-header { display: none; padding: 6px 8px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: 0; z-index: 100; }
   .app-header .logo-text { font-weight: 600; font-size: 14px; flex-shrink: 0; }
 
   /* Botão Bot Ativo no header mobile */
@@ -147,19 +147,18 @@
   .instance-card .ic-actions .btn { flex: 1; min-width: 90px; }
 
   @media (max-width: 768px) {
-    .sidebar { position: fixed; left: -240px; top: 0; bottom: 0; width: 240px; z-index: 999; transition: left 0.3s ease; }
+    .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; width: 260px; z-index: 999; transition: left 0.3s ease; box-shadow: 4px 0 20px rgba(0,0,0,0.5); }
     .sidebar.open { left: 0; }
     .overlay.open { display: block; }
     .app-header { display: flex; }
+    .menu-btn { display: inline-flex; }
     #header-bot-btn { display: inline-flex; }
     .content { padding: 12px; margin-top: 0; height: calc(100vh - 55px); overflow-y: auto; }
     .row { flex-direction: column; align-items: stretch; }
     .btn { min-height: 44px; justify-content: center; }
     input, select, textarea { font-size: 16px; }
-    /* Instâncias: tabela vira cards no mobile */
     #instances-table-wrap table { display: none; }
     #instances-cards { display: block; }
-    /* Em desktop: esconde cards, mostra tabela */
     #page-playground .row-playground { flex-direction: column !important; height: auto !important; }
     #page-playground .card { width: 100% !important; max-height: none !important; }
     #page-history > div { flex-direction: column; }
@@ -200,7 +199,7 @@
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
-<div class="overlay" onclick="toggleMenu()"></div>
+<div class="overlay" onclick="closeMenu()"></div>
 
 <div class="app" id="app-screen" style="display:none">
   <aside class="sidebar" id="sidebar">
@@ -483,6 +482,11 @@ let token = localStorage.getItem('token')
 let currentTenant = localStorage.getItem('tenant') || 'default'
 
 // UI Utilities
+function closeMenu() {
+  document.getElementById('sidebar').classList.remove('open')
+  document.querySelector('.overlay').classList.remove('open')
+}
+
 function toggleMenu() {
   document.getElementById('sidebar').classList.toggle('open')
   document.querySelector('.overlay').classList.toggle('open')
@@ -585,13 +589,18 @@ function updateBotToggleUI(isActive) {
 function logout() {
   localStorage.removeItem('token')
   token = null
+  closeMenu()
   document.getElementById('login-screen').style.display = 'flex'
   document.getElementById('app-screen').style.display = 'none'
+  document.getElementById('app-header').style.display = 'none'
 }
 
 function showApp() {
   document.getElementById('login-screen').style.display = 'none'
   document.getElementById('app-screen').style.display = 'flex'
+  // Garante que o header mobile seja visível (o CSS cuida do display via media query,
+  // mas resetamos qualquer inline style que possa ter sobreposto)
+  document.getElementById('app-header').style.removeProperty('display')
   // Carrega estado inicial do bot ao abrir o app
   api('GET', `/api/config/${currentTenant}`).then(data => {
     if (data) updateBotToggleUI(data.bot_active ?? 1)
@@ -600,6 +609,9 @@ function showApp() {
 }
 
 function navigate(page) {
+  // Fecha o menu drawer no mobile ao navegar
+  closeMenu()
+
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
   const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(el => el.getAttribute('onclick')?.includes(`navigate('${page}')`))
   if (activeNav) activeNav.classList.add('active')
