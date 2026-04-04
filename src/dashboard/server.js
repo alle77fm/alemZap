@@ -13,7 +13,7 @@ import qrcode from 'qrcode'
 import multer from 'multer'
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
-const pdf = require('pdf-parse')
+import pdfParse from 'pdf-parse'
 import * as openaiProvider from '../providers/openai.js'
 import * as deepseekProvider from '../providers/deepseek.js'
 
@@ -176,7 +176,7 @@ app.post('/api/config/:tenantId/upload', auth, upload.single('file'), async (req
     
     let text = ''
     if (req.file.mimetype === 'application/pdf') {
-      const data = await pdf(req.file.buffer)
+      const data = await pdfParse(req.file.buffer)
       text = data.text
     } else if (req.file.mimetype === 'text/plain') {
       text = req.file.buffer.toString('utf-8')
