@@ -11,6 +11,8 @@ import fs from 'fs'
 import db from '../../db/database.js'
 import { processMessage, humanizedResponse } from './ai.js'
 import { getConfig } from '../../config/settings.js'
+import { dispatchWebhook } from './webhook.js'
+import { transcribeAudio } from './transcription.js'
 
 const logger = pino({ level: 'silent' })
 const instances = new Map() // instanceId → socket
@@ -163,21 +165,45 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
       if (msg.key.fromMe) continue
       if (msg.key.remoteJid.endsWith('@g.us')) continue
 
-      const text = extractText(msg)
-      if (!text?.trim()) continue
-
       const jid = msg.key.remoteJid
       const phone = jid.split('@')[0]
 
+      // Extrai texto ou tenta transcrever áudio
+      let text = extractText(msg)
+
+      if (!text?.trim()) {
+        const isAudio = msg.message?.audioMessage || msg.message?.pttMessage
+        if (isAudio) {
+          text = await transcribeAudio(sock, msg, tenantId)
+          if (!text) continue
+        } else {
+          continue
+        }
+      }
+
       try {
         const config = getConfig(tenantId)
-        if (!config.bot_active) return
+        if (!config.bot_active) continue
+
+        // Webhook: mensagem recebida
+        dispatchWebhook(tenantId, 'message_received', {
+          phone,
+          message: text,
+          instance_id: instanceId,
+        })
 
         const reply = await processMessage(tenantId, instanceId, phone, text)
         if (!reply) continue
 
         await humanizedResponse(reply, sock, jid)
         await sock.sendMessage(jid, { text: reply })
+
+        // Webhook: resposta enviada
+        dispatchWebhook(tenantId, 'message_sent', {
+          phone,
+          message: reply,
+          instance_id: instanceId,
+        })
 
         console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
       } catch (err) {

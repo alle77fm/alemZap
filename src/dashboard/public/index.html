@@ -329,6 +329,30 @@
         <input type="number" id="cfg-delay-min" value="2000" />
         <label>Delay máximo (ms)</label>
         <input type="number" id="cfg-delay-max" value="5000" />
+      </div>
+
+      <div class="card">
+        <h3>Integração n8n / Webhooks</h3>
+        <div class="row">
+          <span style="font-size:14px">Webhooks ativados</span>
+          <label class="toggle">
+            <input type="checkbox" id="cfg-webhook-enabled" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <label>URL do Webhook</label>
+        <input type="text" id="cfg-webhook-url" placeholder="https://seu-n8n.com/webhook/..." />
+        
+        <div style="margin-top: 16px; border-top: 1px solid #2a2a2a; padding-top: 16px;">
+          <h4 style="font-size: 14px; color: #ccc; margin-bottom: 8px;">API Key para envio ativo</h4>
+          <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Use esta key no header <code>x-api-key</code> ao chamar POST /api/webhook/send</p>
+          <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+            <input type="text" id="cfg-api-key" readonly placeholder="Nenhuma key gerada" style="flex:1; min-width:200px; background:#111; color:#25d366; cursor:pointer;" onclick="this.select()" />
+            <button class="btn btn-secondary" onclick="generateApiKey()">Gerar Nova Key</button>
+          </div>
+        </div>
+      </div>
+
       <button class="btn btn-primary" id="btn-save-cfg" onclick="saveConfig()">Salvar configurações</button>
     </div>
   </div>
@@ -817,6 +841,9 @@ async function loadConfig() {
   document.getElementById('cfg-delay-min').value = data.delay_min || 2000
   document.getElementById('cfg-delay-max').value = data.delay_max || 5000
   document.getElementById('cfg-ai-enabled').checked = data.ai_enabled === 1
+  document.getElementById('cfg-webhook-enabled').checked = data.webhook_enabled === 1
+  document.getElementById('cfg-webhook-url').value = data.webhook_url || ''
+  document.getElementById('cfg-api-key').value = data.api_key || ''
   // Exibe keys mascaradas (ex: ••••1234) se existirem
   document.getElementById('cfg-openai-key').value = data.openai_key || ''
   document.getElementById('cfg-gemini-key').value = data.gemini_key || ''
@@ -840,6 +867,8 @@ async function saveConfig() {
     delay_min: parseInt(document.getElementById('cfg-delay-min').value),
     delay_max: parseInt(document.getElementById('cfg-delay-max').value),
     ai_enabled: document.getElementById('cfg-ai-enabled').checked ? 1 : 0,
+    webhook_enabled: document.getElementById('cfg-webhook-enabled').checked ? 1 : 0,
+    webhook_url: document.getElementById('cfg-webhook-url').value.trim()
   }
   const keyOpenai = document.getElementById('cfg-openai-key').value.trim()
   const keyGemini = document.getElementById('cfg-gemini-key').value.trim()
@@ -863,6 +892,19 @@ async function saveConfig() {
     showToast('Erro ao salvar configurações', 'error')
   } finally {
     setLoading('btn-save-cfg', false, 'Salvar configurações')
+  }
+}
+
+async function generateApiKey() {
+  if (!confirm('Gerar uma nova API Key invalidará a anterior caso exista. Deseja continuar?')) return
+  try {
+    const res = await api('POST', `/api/config/${currentTenant}/api-key`)
+    if (res && res.api_key) {
+      document.getElementById('cfg-api-key').value = res.api_key
+      showToast('Nova API Key gerada!', 'success')
+    }
+  } catch(e) {
+    showToast('Erro ao gerar API Key', 'error')
   }
 }
 

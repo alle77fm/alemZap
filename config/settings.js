@@ -12,6 +12,9 @@ const DEFAULTS = {
   temperature: 0.7,
   top_p: 1.0,
   response_format: 'text',
+  webhook_url: '',
+  webhook_enabled: 0,
+  api_key: '',
 }
 
 export function getConfig(tenantId) {
@@ -25,16 +28,21 @@ export function saveConfig(tenantId, updates) {
 
   db.prepare(`
     INSERT INTO tenant_config (tenant_id, provider, openai_key, gemini_key, model,
-      system_prompt, knowledge_base, delay_min, delay_max, ai_enabled, bot_active, temperature, top_p, response_format)
+      system_prompt, knowledge_base, delay_min, delay_max, ai_enabled, bot_active,
+      temperature, top_p, response_format, webhook_url, webhook_enabled, api_key)
     VALUES (@tenant_id, @provider, @openai_key, @gemini_key, @model,
-      @system_prompt, @knowledge_base, @delay_min, @delay_max, @ai_enabled, @bot_active, @temperature, @top_p, @response_format)
+      @system_prompt, @knowledge_base, @delay_min, @delay_max, @ai_enabled, @bot_active,
+      @temperature, @top_p, @response_format, @webhook_url, @webhook_enabled, @api_key)
     ON CONFLICT(tenant_id) DO UPDATE SET
       provider=excluded.provider, openai_key=excluded.openai_key,
       gemini_key=excluded.gemini_key, model=excluded.model,
       system_prompt=excluded.system_prompt, knowledge_base=excluded.knowledge_base,
       delay_min=excluded.delay_min, delay_max=excluded.delay_max,
-      ai_enabled=excluded.ai_enabled, bot_active=excluded.bot_active, temperature=excluded.temperature,
-      top_p=excluded.top_p, response_format=excluded.response_format
+      ai_enabled=excluded.ai_enabled, bot_active=excluded.bot_active,
+      temperature=excluded.temperature, top_p=excluded.top_p,
+      response_format=excluded.response_format,
+      webhook_url=excluded.webhook_url, webhook_enabled=excluded.webhook_enabled,
+      api_key=excluded.api_key
   `).run(merged)
 }
 

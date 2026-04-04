@@ -209,6 +209,60 @@ app.post('/api/config/:tenantId/toggle-bot', auth, (req, res) => {
   res.json({ bot_active: novoValor })
 })
 
+app.post('/api/config/:tenantId/api-key', auth, (req, res) => {
+  const crypto = require('crypto')
+  const apiKey = crypto.randomBytes(16).toString('hex')
+  saveConfig(req.params.tenantId, { api_key: apiKey })
+  res.json({ api_key: apiKey })
+})
+
+// ── Routes: Webhook (N8N) ─────────────────────────────────────────────────────
+
+app.post('/api/webhook/send', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization
+    const apiKeyHeader = req.headers['x-api-key']
+    
+    let authenticated = false
+    let tenantIdStr = req.body.tenant_id
+
+    if (apiKeyHeader) {
+      const config = db.prepare('SELECT tenant_id FROM tenant_config WHERE api_key = ? AND api_key != ""').get(apiKeyHeader)
+      if (config) {
+        authenticated = true
+        tenantIdStr = config.tenant_id
+      }
+    } else if (authHeader) {
+      const token = authHeader.split(' ')[1]
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET)
+        authenticated = true
+        if (!tenantIdStr) tenantIdStr = decoded.tenant_id
+      } catch (e) {}
+    }
+
+    if (!authenticated) return res.status(401).json({ error: 'Não autorizado' })
+
+    const { instance_id, phone, message } = req.body
+    if (!instance_id || !phone || !message) {
+      return res.status(400).json({ error: 'Campos obrigatórios faltantes: instance_id, phone, message' })
+    }
+
+    const sock = getInstance(instance_id)
+    if (!sock) return res.status(404).json({ error: 'Instância offline ou não encontrada' })
+
+    const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`
+    await sock.sendMessage(jid, { text: message })
+
+    // Opcional: Registrar envio também no webhook!
+    // (A chamada de sendMessage aqui dispara dispatchWebhook em messages.update, mas não upsert, então podemos não misturar)
+
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── Routes: WhatsApp Instances ────────────────────────────────────────────────
 
 app.get('/api/instances/:tenantId', auth, (req, res) => {

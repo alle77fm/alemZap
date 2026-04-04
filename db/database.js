@@ -5,6 +5,10 @@ import fs from 'fs'
 const DATA_DIR = path.resolve('data')
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
 
+// Garantir pasta tmp
+const TMP_DIR = path.resolve('data/tmp')
+if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true })
+
 const db = new Database(path.join(DATA_DIR, 'db.sqlite'))
 
 db.exec(`
@@ -69,5 +73,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 `)
+
+// Migrations seguras — adiciona colunas novas sem quebrar banco existente
+const migrations = [
+  `ALTER TABLE tenant_config ADD COLUMN webhook_url TEXT DEFAULT ''`,
+  `ALTER TABLE tenant_config ADD COLUMN webhook_enabled INTEGER DEFAULT 0`,
+  `ALTER TABLE tenant_config ADD COLUMN api_key TEXT DEFAULT ''`,
+]
+for (const sql of migrations) {
+  try { db.prepare(sql).run() } catch (_) { /* coluna já existe */ }
+}
 
 export default db
