@@ -158,15 +158,26 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
     }
   })
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async ({ messages: incomingMessages, type }) => {
     if (type !== 'notify') return
 
-    for (const msg of messages) {
+    for (const msg of incomingMessages) {
+      if (!msg.key?.id) continue
+      const messageId = msg.key.id
+
       if (msg.key.fromMe) continue
       if (msg.key.remoteJid.endsWith('@g.us')) continue
 
       const jid = msg.key.remoteJid
       const phone = jid.split('@')[0]
+
+      try {
+        const alreadyProcessed = db.prepare('SELECT id FROM processed_messages WHERE message_id = ?').get(messageId)
+        if (alreadyProcessed) continue
+        db.prepare('INSERT INTO processed_messages (message_id, created_at) VALUES (?, datetime("now"))').run(messageId)
+      } catch (e) {
+        // console.error(`[${tenantId}] Silenciado aviso tabela processed_messages não declarada:`, e.message)
+      }
 
       // Extrai texto ou tenta transcrever áudio
       let text = extractText(msg)
@@ -192,62 +203,75 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           instance_id: instanceId,
         })
 
-        const messages = await processMessage(tenantId, instanceId, phone, text)
-        if (!messages) continue
-        const msgs = Array.isArray(messages) ? messages : [messages]
+        // Persistência de lead e histórico da última mensagem recebida
+        try {
+          const checkLead = db.prepare('SELECT id FROM leads WHERE phone = ? AND tenant_id = ?').get(phone, tenantId)
+          const now = new Date().toISOString()
+          if (!checkLead) {
+            db.prepare('INSERT INTO leads (phone, tenant_id, last_message, updated_at) VALUES (?, ?, ?, ?)').run(phone, tenantId, text, now)
+          } else {
+            db.prepare('UPDATE leads SET last_message = ?, updated_at = ? WHERE id = ?').run(text, now, checkLead.id)
+          }
+        } catch (e) {}
+
+        const aiResponse = await processMessage(tenantId, instanceId, phone, text)
+        if (!aiResponse) continue
+        
+        // Garante que a IA seja repassada como array iterável
+        const msgs = Array.isArray(aiResponse) ? aiResponse : [aiResponse]
         const sentMessages = []
 
-        for (const msg of msgs) {
-          if (typeof msg !== 'string') continue
-          const isLead = msg.includes('[LEAD_QUALIFICADO]')
-          const cleanMsg = msg.replace('[LEAD_QUALIFICADO]', '').trim()
+        // Utilizando msgText em vez de sobrescrever o msg local
+        for (const msgText of msgs) {
+          if (typeof msgText !== 'string') continue
+          const isLead = msgText.includes('[LEAD_QUALIFICADO]')
+          const cleanMsg = msgText.replace(/\[LEAD_QUALIFICADO\]/g, '').trim()
+
           if (isLead) {
+            console.log(`[LEAD QUALIFICADO] ${phone}`)
             dispatchWebhook(tenantId, 'lead_qualificado', {
               phone,
               instance_id: instanceId,
             })
           }
+
           if (cleanMsg.length === 0) continue
+
           await sock.sendPresenceUpdate('composing', jid)
-          const typingDelay = Math.min(cleanMsg.length * (Math.floor(Math.random() * 31) + 40), 6000)
+          
+          // Novo cálculo mais fluido e humano de UX digitando
+          const typingDelay = Math.min(
+            800 + cleanMsg.length * (20 + Math.random() * 20),
+            4000
+          )
+          
           await new Promise(r => setTimeout(r, typingDelay))
           await sock.sendPresenceUpdate('paused', jid)
           await sock.sendMessage(jid, { text: cleanMsg })
           await new Promise(r => setTimeout(r, Math.floor(Math.random() * 701) + 500))
+          
           sentMessages.push(cleanMsg)
         }
-<<<<<<< HEAD
-
-       // Webhook: resposta enviada
-        dispatchWebhook(tenantId, 'message_sent', {
-          phone,
-          instance_id: instanceId,
-        })
-=======
 
         if (sentMessages.length > 0) {
-  // Envia mensagens de forma humanizada (uma por vez)
-  const delay = (ms) => new Promise(r => setTimeout(r, ms))
+          // Despacha webhook de enviado para cada mensagem separadamente (evita blocos join)
+          for (const iterMsg of sentMessages) {
+            dispatchWebhook(tenantId, 'message_sent', {
+              phone,
+              message: iterMsg,
+              instance_id: instanceId,
+            })
+          }
+          console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
+        }
+      } catch (err) {
+        console.error(`Erro instância ${instanceId}:`, err.message)
+        await sock.sendPresenceUpdate('paused', jid)
+      }
+    }
+  })
 
-  for (const msg of sentMessages) {
-    // simula digitando
-    await sock.sendPresenceUpdate('composing', jid)
-    await delay(800 + Math.random() * 1200)
-
-    // envia mensagem
-    await sock.sendMessage(jid, { text: msg })
-
-    // dispara webhook individual (não agrupado)
-    dispatchWebhook(tenantId, 'message_sent', {
-      phone,
-      message: msg,
-      instance_id: instanceId,
-    })
-  }
-
-  console.log(
-    `[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`
-  )
+  return sock
 }
 
 export async function stopInstance(instanceId) {
@@ -282,4 +306,3 @@ function extractText(msg) {
   if (!m) return null
   return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || null
 }
-
