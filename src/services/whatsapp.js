@@ -218,30 +218,36 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
         }
 <<<<<<< HEAD
 
-        // Webhook: resposta enviada
+       // Webhook: resposta enviada
         dispatchWebhook(tenantId, 'message_sent', {
           phone,
           instance_id: instanceId,
         })
 =======
->>>>>>> 17ef722fd838116f607a70c6e9081743bcf7be32
 
         if (sentMessages.length > 0) {
-          dispatchWebhook(tenantId, 'message_sent', {
-            phone,
-            message: sentMessages.join(' | '),
-            instance_id: instanceId,
-          })
-          console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
-        }
-      } catch (err) {
-        console.error(`Erro instância ${instanceId}:`, err.message)
-        await sock.sendPresenceUpdate('paused', jid)
-      }
-    }
-  })
+  // Envia mensagens de forma humanizada (uma por vez)
+  const delay = (ms) => new Promise(r => setTimeout(r, ms))
 
-  return sock
+  for (const msg of sentMessages) {
+    // simula digitando
+    await sock.sendPresenceUpdate('composing', jid)
+    await delay(800 + Math.random() * 1200)
+
+    // envia mensagem
+    await sock.sendMessage(jid, { text: msg })
+
+    // dispara webhook individual (não agrupado)
+    dispatchWebhook(tenantId, 'message_sent', {
+      phone,
+      message: msg,
+      instance_id: instanceId,
+    })
+  }
+
+  console.log(
+    `[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`
+  )
 }
 
 export async function stopInstance(instanceId) {
