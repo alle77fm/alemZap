@@ -202,7 +202,10 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           const isLead = msg.includes('[LEAD_QUALIFICADO]')
           const cleanMsg = msg.replace('[LEAD_QUALIFICADO]', '').trim()
           if (isLead) {
-            dispatchWebhook(tenantId, 'lead_qualificado', { phone, instance_id: instanceId })
+            dispatchWebhook(tenantId, 'lead_qualificado', {
+              phone,
+              instance_id: instanceId,
+            })
           }
           if (cleanMsg.length === 0) continue
           await sock.sendPresenceUpdate('composing', jid)
@@ -213,14 +216,24 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           await new Promise(r => setTimeout(r, Math.floor(Math.random() * 701) + 500))
           sentMessages.push(cleanMsg)
         }
+<<<<<<< HEAD
 
         // Webhook: resposta enviada
         dispatchWebhook(tenantId, 'message_sent', {
           phone,
           instance_id: instanceId,
         })
+=======
+>>>>>>> 17ef722fd838116f607a70c6e9081743bcf7be32
 
-        console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
+        if (sentMessages.length > 0) {
+          dispatchWebhook(tenantId, 'message_sent', {
+            phone,
+            message: sentMessages.join(' | '),
+            instance_id: instanceId,
+          })
+          console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
+        }
       } catch (err) {
         console.error(`Erro instância ${instanceId}:`, err.message)
         await sock.sendPresenceUpdate('paused', jid)

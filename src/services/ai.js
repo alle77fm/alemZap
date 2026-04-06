@@ -19,10 +19,12 @@ export async function processMessage(tenantId, instanceId, phone, message) {
   const ctx = {
     apiKey,
     model: config.model,
-    systemPrompt: config.system_prompt,
-    knowledgeBase: config.knowledge_base,
+    systemPrompt: config.system_prompt || '',
+    knowledgeBase: config.knowledge_base || '',
     history,
     message,
+    temperature: config.temperature,
+    top_p: config.top_p,
   }
 
   const reply = config.provider === 'deepseek'

@@ -80,6 +80,9 @@ const migrations = [
   `ALTER TABLE tenant_config ADD COLUMN webhook_enabled INTEGER DEFAULT 0`,
   `ALTER TABLE tenant_config ADD COLUMN api_key TEXT DEFAULT ''`,
   `ALTER TABLE tenant_config ADD COLUMN deepseek_key TEXT DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN reset_token TEXT`,
+  `ALTER TABLE users ADD COLUMN reset_token_expires TEXT`
 ]
 for (const sql of migrations) {
   try { db.prepare(sql).run() } catch (_) { /* coluna já existe */ }

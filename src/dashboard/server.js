@@ -16,6 +16,7 @@ const require = createRequire(import.meta.url)
 
 import * as openaiProvider from '../providers/openai.js'
 import * as deepseekProvider from '../providers/deepseek.js'
+import { sendWelcomeEmail, sendResetEmail } from '../services/mailer.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -75,6 +76,11 @@ app.post('/api/auth/login', async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' })
 
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id }, JWT_SECRET, { expiresIn: '7d' })
+  
+  if (user.must_change_password === 1) {
+    return res.json({ must_change_password: true, token })
+  }
+
   res.json({ token, user: { email: user.email, role: user.role } })
 })
 
@@ -90,7 +96,28 @@ app.post('/api/auth/change-password', auth, async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Senha atual incorreta' })
 
   const hash = await bcrypt.hash(newPassword, 10)
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id)
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hash, user.id)
+  res.json({ ok: true })
+})
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body
+  if (!email) return res.status(400).json({ error: 'Email obrigatório' })
+  
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  if (!user) return res.json({ ok: true }) // Não revelar se e-mail existe para segurança
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 3600000).toISOString() // 1 hora
+  
+  db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?').run(token, expires, user.id)
+  
+  try {
+    await sendResetEmail(email, token)
+  } catch (err) {
+    console.error('Erro ao enviar e-mail de recuperação:', err)
+  }
+  
   res.json({ ok: true })
 })
 
@@ -104,13 +131,24 @@ app.get('/api/users', auth, (req, res) => {
 
 app.post('/api/users', auth, async (req, res) => {
   if (!['admin', 'superadmin'].includes(req.user.role)) return res.status(403).json({ error: 'Sem permissão' })
-  const { email, password, tenant_id, role } = req.body
-  if (!email || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' })
-  const allowedRoles = ['admin', 'viewer']
-  const userRole = allowedRoles.includes(role) ? role : 'admin'
+  const { email, name } = req.body
+  if (!email) return res.status(400).json({ error: 'Email é obrigatório' })
   try {
-    const hash = await bcrypt.hash(password, 10)
-    db.prepare('INSERT INTO users (email, password_hash, role, tenant_id) VALUES (?, ?, ?, ?)').run(email, hash, userRole, tenant_id || null)
+    const tempPassword = crypto.randomBytes(4).toString('hex') // 8 characters
+    const hash = await bcrypt.hash(tempPassword, 10)
+    
+    // Cria tenant automático
+    const tenantId = email.split('@')[0]
+    try {
+      createTenant(tenantId, name || tenantId, email)
+    } catch (e) {
+      // Ignora se tenant já existe
+    }
+
+    db.prepare('INSERT INTO users (email, password_hash, role, tenant_id, must_change_password) VALUES (?, ?, ?, ?, ?)').run(email, hash, 'admin', tenantId, 1)
+    
+    await sendWelcomeEmail(email, tempPassword)
+    
     res.json({ ok: true })
   } catch (e) {
     res.status(400).json({ error: e.message })
