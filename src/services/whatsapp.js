@@ -195,29 +195,28 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
         const messages = await processMessage(tenantId, instanceId, phone, text)
         if (!messages) continue
         const msgs = Array.isArray(messages) ? messages : [messages]
+        const sentMessages = []
 
         for (const msg of msgs) {
+          if (typeof msg !== 'string') continue
           const isLead = msg.includes('[LEAD_QUALIFICADO]')
           const cleanMsg = msg.replace('[LEAD_QUALIFICADO]', '').trim()
-
           if (isLead) {
             dispatchWebhook(tenantId, 'lead_qualificado', { phone, instance_id: instanceId })
           }
-
           if (cleanMsg.length === 0) continue
-
           await sock.sendPresenceUpdate('composing', jid)
           const typingDelay = Math.min(cleanMsg.length * (Math.floor(Math.random() * 31) + 40), 6000)
           await new Promise(r => setTimeout(r, typingDelay))
           await sock.sendPresenceUpdate('paused', jid)
           await sock.sendMessage(jid, { text: cleanMsg })
           await new Promise(r => setTimeout(r, Math.floor(Math.random() * 701) + 500))
-
-          dispatchWebhook(tenantId, 'message_sent', { phone, message: cleanMsg, instance_id: instanceId })
+          sentMessages.push(cleanMsg)
         }
+
+        // Webhook: resposta enviada
         dispatchWebhook(tenantId, 'message_sent', {
           phone,
-          message: reply,
           instance_id: instanceId,
         })
 
