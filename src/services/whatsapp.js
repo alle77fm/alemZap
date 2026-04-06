@@ -192,48 +192,42 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           instance_id: instanceId,
         })
 
-        const aiResponse = await processMessage(tenantId, instanceId, phone, text)
-        if (!aiResponse) continue
-
-        const msgs = Array.isArray(aiResponse) ? aiResponse : [aiResponse]
-        const sleep = (ms) => new Promise(r => setTimeout(r, ms))
-        const random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
-
+        const messages = await processMessage(tenantId, instanceId, phone, text)
+        if (!messages) continue
+        const msgs = Array.isArray(messages) ? messages : [messages]
         const sentMessages = []
 
         for (const msg of msgs) {
           if (typeof msg !== 'string') continue
           const isLead = msg.includes('[LEAD_QUALIFICADO]')
-          const cleanMsg = msg.replace(/\[LEAD_QUALIFICADO\]/g, '').trim()
+          const cleanMsg = msg.replace('[LEAD_QUALIFICADO]', '').trim()
 
           if (isLead) {
-            dispatchWebhook(tenantId, 'lead_qualificado', { phone, instance_id: instanceId })
+            dispatchWebhook(tenantId, 'lead_qualificado', {
+              phone,
+              instance_id: instanceId,
+            })
           }
 
-          if (cleanMsg.length > 0) {
-            await sock.sendPresenceUpdate('composing', jid)
-            const typingDelay = Math.min(cleanMsg.length * random(40, 70), 6000)
-            await sleep(typingDelay)
-            await sock.sendPresenceUpdate('paused', jid)
-            await sock.sendMessage(jid, { text: cleanMsg })
-            
-            sentMessages.push(cleanMsg)
-            
-            // Pausa natural entre mensagens
-            await sleep(random(500, 1200))
-          }
+          if (cleanMsg.length === 0) continue
+
+          await sock.sendPresenceUpdate('composing', jid)
+          const typingDelay = Math.min(cleanMsg.length * (Math.floor(Math.random() * 31) + 40), 6000)
+          await new Promise(r => setTimeout(r, typingDelay))
+          await sock.sendPresenceUpdate('paused', jid)
+          await sock.sendMessage(jid, { text: cleanMsg })
+          await new Promise(r => setTimeout(r, Math.floor(Math.random() * 701) + 500))
+          sentMessages.push(cleanMsg)
         }
 
         if (sentMessages.length > 0) {
-          // Webhook: resposta enviada
           dispatchWebhook(tenantId, 'message_sent', {
             phone,
-            message: sentMessages.join('\n\n'),
+            message: sentMessages.join(' | '),
             instance_id: instanceId,
           })
+          console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
         }
-
-        console.log(`[${tenantId}/${instanceId}] ${phone}: ${text.substring(0, 50)}...`)
       } catch (err) {
         console.error(`Erro instância ${instanceId}:`, err.message)
         await sock.sendPresenceUpdate('paused', jid)
