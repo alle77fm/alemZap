@@ -72,6 +72,23 @@ db.exec(`
     role TEXT DEFAULT 'admin',
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  -- Gestão de leads
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    last_message TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  );
+
+  -- Anti-duplicação de webhooks/mensagens do Baileys
+  CREATE TABLE IF NOT EXISTS processed_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id TEXT UNIQUE,
+    created_at TEXT
+  );
 `)
 
 // Migrations seguras — adiciona colunas novas sem quebrar banco existente

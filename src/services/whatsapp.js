@@ -282,3 +282,4 @@ function extractText(msg) {
   if (!m) return null
   return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || null
 }
+
