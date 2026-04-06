@@ -192,13 +192,29 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           instance_id: instanceId,
         })
 
-        const reply = await processMessage(tenantId, instanceId, phone, text)
-        if (!reply) continue
+        const messages = await processMessage(tenantId, instanceId, phone, text)
+        if (!messages) continue
+        const msgs = Array.isArray(messages) ? messages : [messages]
 
-        await humanizedResponse(reply, sock, jid)
-        await sock.sendMessage(jid, { text: reply })
+        for (const msg of msgs) {
+          const isLead = msg.includes('[LEAD_QUALIFICADO]')
+          const cleanMsg = msg.replace('[LEAD_QUALIFICADO]', '').trim()
 
-        // Webhook: resposta enviada
+          if (isLead) {
+            dispatchWebhook(tenantId, 'lead_qualificado', { phone, instance_id: instanceId })
+          }
+
+          if (cleanMsg.length === 0) continue
+
+          await sock.sendPresenceUpdate('composing', jid)
+          const typingDelay = Math.min(cleanMsg.length * (Math.floor(Math.random() * 31) + 40), 6000)
+          await new Promise(r => setTimeout(r, typingDelay))
+          await sock.sendPresenceUpdate('paused', jid)
+          await sock.sendMessage(jid, { text: cleanMsg })
+          await new Promise(r => setTimeout(r, Math.floor(Math.random() * 701) + 500))
+
+          dispatchWebhook(tenantId, 'message_sent', { phone, message: cleanMsg, instance_id: instanceId })
+        }
         dispatchWebhook(tenantId, 'message_sent', {
           phone,
           message: reply,

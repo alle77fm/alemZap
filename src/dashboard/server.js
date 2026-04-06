@@ -13,7 +13,7 @@ import qrcode from 'qrcode'
 import multer from 'multer'
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
-import pdfParse from 'pdf-parse'
+
 import * as openaiProvider from '../providers/openai.js'
 import * as deepseekProvider from '../providers/deepseek.js'
 
@@ -176,8 +176,19 @@ app.post('/api/config/:tenantId/upload', auth, upload.single('file'), async (req
     
     let text = ''
     if (req.file.mimetype === 'application/pdf') {
-      const data = await pdfParse(req.file.buffer)
-      text = data.text
+      const raw = req.file.buffer.toString('binary')
+      const matches = raw.match(/BT[\s\S]*?ET/g) || []
+      let extracted = ''
+      for (const block of matches) {
+        const texts = block.match(/\(([^)]+)\)\s*Tj/g) || []
+        for (const t of texts) {
+          extracted += t.replace(/\(|\)\s*Tj/g, '') + ' '
+        }
+      }
+      text = extracted.trim()
+      if (!text || text.length < 20) {
+        return res.status(400).json({ error: 'Nao foi possivel extrair texto. Converta para TXT.' })
+      }
     } else if (req.file.mimetype === 'text/plain') {
       text = req.file.buffer.toString('utf-8')
     } else {
