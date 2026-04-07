@@ -587,7 +587,13 @@ async function login() {
     if (data.token) {
       token = data.token
       localStorage.setItem('token', token)
-      showApp()
+      if (data.must_change_password) {
+        showApp()
+        navigate('account')
+        showToast('Por segurança, troque sua senha antes de continuar.', 'error')
+      } else {
+        showApp()
+      }
     } else {
       document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${data.error}</div>`
     }
