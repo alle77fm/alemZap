@@ -510,6 +510,22 @@
 let token = localStorage.getItem('token')
 let currentTenant = localStorage.getItem('tenant') || 'default'
 
+function getTenantFromToken() {
+  if (!token) return 'default'
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.tenant_id || 'default'
+  } catch { return 'default' }
+}
+
+function getRoleFromToken() {
+  if (!token) return 'viewer'
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role || 'viewer'
+  } catch { return 'viewer' }
+}
+
 // UI Utilities
 function closeMenu() {
   document.getElementById('sidebar').classList.remove('open')
@@ -673,6 +689,26 @@ function showApp() {
       }
     })
     document.getElementById('bot-toggle-btn').style.display = 'none'
+  }
+
+  // Define tenant correto pelo token
+  currentTenant = getTenantFromToken()
+  const role = getRoleFromToken()
+
+  // Esconde menus restritos para viewer
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.style.display = ''
+  })
+  if (role === 'viewer') {
+    document.querySelectorAll('.nav-item').forEach(el => {
+      const onclick = el.getAttribute('onclick') || ''
+      if (onclick.includes('tenants') || onclick.includes('playground') || onclick.includes('history')) {
+        el.style.display = 'none'
+      }
+    })
+    document.getElementById('bot-toggle-btn').style.display = 'none'
+  } else {
+    document.getElementById('bot-toggle-btn').style.display = ''
   }
 
   api('GET', `/api/config/${currentTenant}`).then(data => {
