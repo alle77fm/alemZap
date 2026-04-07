@@ -179,6 +179,19 @@ app.post('/api/tenants', auth, (req, res) => {
   }
 })
 
+app.patch('/api/tenants/:id', auth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Sem permissão' })
+  const { id } = req.params
+  const { name, email } = req.body
+  if (!name || !email) return res.status(400).json({ error: 'Nome e email são obrigatórios' })
+  try {
+    db.prepare('UPDATE tenants SET name = ?, email = ? WHERE id = ?').run(name, email, id)
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
 app.delete('/api/tenants/:id', auth, (req, res) => {
   if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Sem permissão' })
   const { id } = req.params

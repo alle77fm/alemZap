@@ -504,6 +504,20 @@
   </main>
 </div>
 
+<!-- MODAL EDITAR TENANT -->
+<div id="edit-tenant-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:16px;padding:28px;width:420px;max-width:95vw;position:relative">
+    <button onclick="closeEditTenant()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#888;font-size:20px;cursor:pointer">✕</button>
+    <h3 style="margin:0 0 20px">Editar Tenant</h3>
+    <input type="hidden" id="edit-tenant-id" />
+    <label>Nome</label>
+    <input type="text" id="edit-tenant-name" placeholder="Nome do cliente" />
+    <label>Email</label>
+    <input type="email" id="edit-tenant-email" placeholder="Email" style="margin-top:12px" />
+    <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="saveEditTenant()">Salvar</button>
+  </div>
+</div>
+
 <div id="toast-container" class="toast-container"></div>
 
 <script>
@@ -1152,7 +1166,10 @@ async function loadTenants() {
       <td>${t.email}</td>
       <td><span class="badge ${t.active ? 'badge-green' : 'badge-gray'}">${t.active ? 'ativo' : 'inativo'}</span></td>
       <td style="color:#666;font-size:12px">${new Date(t.created_at).toLocaleDateString('pt-BR')}</td>
-      <td>${t.id !== 'default' ? `<button class="btn btn-danger btn-sm" onclick="deleteTenant('${t.id}')">🗑️</button>` : ''}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="openEditTenant('${t.id}','${t.name}','${t.email}')">✏️</button>
+        ${t.id !== 'default' ? `<button class="btn btn-danger btn-sm" onclick="deleteTenant('${t.id}')">🗑️</button>` : ''}
+      </td>
     </tr>
   `).join('') || '<tr><td colspan="6" style="color:#555;text-align:center">Nenhum tenant</td></tr>'
 
@@ -1163,6 +1180,32 @@ async function loadTenants() {
     data.map(t => `<option value="${t.id}" ${cur===t.id?'selected':''}>${t.name} (${t.id})</option>`).join('')
 
   loadUsers()
+}
+
+function openEditTenant(id, name, email) {
+  document.getElementById('edit-tenant-id').value = id
+  document.getElementById('edit-tenant-name').value = name
+  document.getElementById('edit-tenant-email').value = email
+  document.getElementById('edit-tenant-modal').style.display = 'flex'
+}
+
+function closeEditTenant() {
+  document.getElementById('edit-tenant-modal').style.display = 'none'
+}
+
+async function saveEditTenant() {
+  const id = document.getElementById('edit-tenant-id').value
+  const name = document.getElementById('edit-tenant-name').value.trim()
+  const email = document.getElementById('edit-tenant-email').value.trim()
+  if (!name || !email) { showToast('Nome e email são obrigatórios', 'error'); return }
+  const res = await api('PATCH', `/api/tenants/${id}`, { name, email })
+  if (res && res.ok) {
+    showToast('Tenant atualizado!', 'success')
+    closeEditTenant()
+    loadTenants()
+  } else {
+    showToast(res?.error || 'Erro ao atualizar tenant', 'error')
+  }
 }
 
 async function deleteTenant(id) {
