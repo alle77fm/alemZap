@@ -259,7 +259,6 @@ export async function startInstance(tenantId, instanceId, onEvent = null) {
           phone,
           instance_id: instanceId,
         })
- 618585f (fix: sincronizacao vps com correcoes manuais)
 
         if (sentMessages.length > 0) {
           // Despacha webhook de enviado para cada mensagem separadamente (evita blocos join)
