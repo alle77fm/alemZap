@@ -99,7 +99,8 @@ const migrations = [
   `ALTER TABLE tenant_config ADD COLUMN deepseek_key TEXT DEFAULT ''`,
   `ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0`,
   `ALTER TABLE users ADD COLUMN reset_token TEXT`,
-  `ALTER TABLE users ADD COLUMN reset_token_expires TEXT`
+  `ALTER TABLE users ADD COLUMN reset_token_expires TEXT`,
+  `ALTER TABLE users ADD COLUMN name TEXT DEFAULT ''`
 ]
 for (const sql of migrations) {
   try { db.prepare(sql).run() } catch (_) { /* coluna já existe */ }

@@ -470,20 +470,17 @@
       <div class="page-title" style="margin-top:8px">Usuários do Sistema</div>
       <div class="card">
         <h3>Novo Usuário</h3>
+        <p style="font-size:13px;color:#888;margin-bottom:16px">Uma senha temporária será gerada e enviada por email. O usuário deverá alterá-la no primeiro acesso.</p>
         <div class="row">
+          <input id="u-name" type="text" placeholder="Nome completo" style="flex:1" />
           <input id="u-email" type="email" placeholder="Email" style="flex:1" />
-          <input id="u-password" type="password" placeholder="Senha inicial" style="flex:1" />
           <select id="u-tenant" style="flex:1"><option value="">— Tenant (opcional) —</option></select>
-          <select id="u-role" style="flex:1;min-width:140px">
-            <option value="admin">Admin</option>
-            <option value="viewer">Visualizador</option>
-          </select>
-          <button class="btn btn-primary btn-sm" style="min-width:100px" onclick="createUser()">+ Criar</button>
+          <button class="btn btn-primary btn-sm" style="min-width:140px" onclick="createUser()">+ Criar e Enviar</button>
         </div>
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>Email</th><th>Perfil</th><th>Tenant</th><th>Criado em</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Tenant</th><th>Criado em</th><th>Ações</th></tr></thead>
           <tbody id="users-table"></tbody>
         </table>
       </div>
@@ -1155,7 +1152,8 @@ async function loadUsers() {
   const tbody = document.getElementById('users-table')
   tbody.innerHTML = data.map(u => `
     <tr>
-      <td>${u.email}</td>
+      <td style="font-weight:500">${u.name || '—'}</td>
+      <td style="color:#888;font-size:13px">${u.email}</td>
       <td><span class="badge ${u.role==='superadmin'?'badge-green':u.role==='admin'?'badge-yellow':'badge-gray'}">${u.role}</span></td>
       <td style="color:#888;font-size:12px">${u.tenant_id || '—'}</td>
       <td style="color:#666;font-size:12px">${new Date(u.created_at).toLocaleDateString('pt-BR')}</td>
@@ -1163,20 +1161,19 @@ async function loadUsers() {
         <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id}, '${u.email}')">🗑️</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="5" style="color:#555;text-align:center">Nenhum usuário</td></tr>'
+  `).join('') || '<tr><td colspan="6" style="color:#555;text-align:center">Nenhum usuário</td></tr>'
 }
 
 async function createUser() {
+  const name = document.getElementById('u-name').value.trim()
   const email = document.getElementById('u-email').value.trim()
-  const password = document.getElementById('u-password').value
   const tenant_id = document.getElementById('u-tenant').value
-  const role = document.getElementById('u-role').value
-  if (!email || !password) { showToast('Email e senha são obrigatórios', 'error'); return }
-  const res = await api('POST', '/api/users', { email, password, tenant_id, role })
+  if (!name || !email) { showToast('Nome e email são obrigatórios', 'error'); return }
+  const res = await api('POST', '/api/users', { name, email, tenant_id })
   if (res && res.ok) {
+    document.getElementById('u-name').value = ''
     document.getElementById('u-email').value = ''
-    document.getElementById('u-password').value = ''
-    showToast('Usuário criado!', 'success')
+    showToast('Usuário criado! Senha enviada por email.', 'success')
     loadUsers()
   } else {
     showToast(res?.error || 'Erro ao criar usuário', 'error')

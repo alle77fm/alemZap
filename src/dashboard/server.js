@@ -125,7 +125,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
 app.get('/api/users', auth, (req, res) => {
   if (!['admin', 'superadmin'].includes(req.user.role)) return res.status(403).json({ error: 'Sem permissão' })
-  const users = db.prepare('SELECT id, email, role, tenant_id, created_at FROM users ORDER BY created_at DESC').all()
+  const users = db.prepare('SELECT id, name, email, role, tenant_id, created_at FROM users ORDER BY created_at DESC').all()
   res.json(users)
 })
 
@@ -145,7 +145,7 @@ app.post('/api/users', auth, async (req, res) => {
       // Ignora se tenant já existe
     }
 
-    db.prepare('INSERT INTO users (email, password_hash, role, tenant_id, must_change_password) VALUES (?, ?, ?, ?, ?)').run(email, hash, 'admin', tenantId, 1)
+    db.prepare('INSERT INTO users (name, email, password_hash, role, tenant_id, must_change_password) VALUES (?, ?, ?, ?, ?, ?)').run(name || email.split('@')[0], email, hash, 'viewer', tenantId, 1)
     
     await sendWelcomeEmail(email, tempPassword)
     
