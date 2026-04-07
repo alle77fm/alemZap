@@ -474,7 +474,7 @@
         <div class="row">
           <input id="u-name" type="text" placeholder="Nome completo" style="flex:1" />
           <input id="u-email" type="email" placeholder="Email" style="flex:1" />
-          <select id="u-tenant" style="flex:1"><option value="">— Tenant (opcional) —</option></select>
+          <select id="u-tenant" style="flex:1"><option value="">— Selecione o Tenant —</option></select>
           <button class="btn btn-primary btn-sm" style="min-width:140px" onclick="createUser()">+ Criar e Enviar</button>
         </div>
       </div>
@@ -658,10 +658,23 @@ function logout() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none'
   document.getElementById('app-screen').style.display = 'flex'
-  // Garante que o header mobile seja visível (o CSS cuida do display via media query,
-  // mas resetamos qualquer inline style que possa ter sobreposto)
   document.getElementById('app-header').style.removeProperty('display')
-  // Carrega estado inicial do bot ao abrir o app
+
+  // Decodifica o token para pegar o role
+  const payload = JSON.parse(atob(token.split('.')[1]))
+  const role = payload.role
+
+  // Esconde menus restritos para viewer
+  if (role === 'viewer') {
+    document.querySelectorAll('.nav-item').forEach(el => {
+      const onclick = el.getAttribute('onclick') || ''
+      if (onclick.includes('tenants') || onclick.includes('playground') || onclick.includes('history')) {
+        el.style.display = 'none'
+      }
+    })
+    document.getElementById('bot-toggle-btn').style.display = 'none'
+  }
+
   api('GET', `/api/config/${currentTenant}`).then(data => {
     if (data) updateBotToggleUI(data.bot_active ?? 1)
   })
@@ -1168,7 +1181,7 @@ async function createUser() {
   const name = document.getElementById('u-name').value.trim()
   const email = document.getElementById('u-email').value.trim()
   const tenant_id = document.getElementById('u-tenant').value
-  if (!name || !email) { showToast('Nome e email são obrigatórios', 'error'); return }
+  if (!name || !email || !tenant_id) { showToast('Nome, email e tenant são obrigatórios', 'error'); return }
   const res = await api('POST', '/api/users', { name, email, tenant_id })
   if (res && res.ok) {
     document.getElementById('u-name').value = ''
