@@ -461,7 +461,7 @@
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>ID</th><th>Nome</th><th>Email</th><th>Status</th><th>Criado em</th></tr></thead>
+          <thead><tr><th>ID</th><th>Nome</th><th>Email</th><th>Status</th><th>Criado em</th><th>Ações</th></tr></thead>
           <tbody id="tenants-table"></tbody>
         </table>
       </div>
@@ -1152,8 +1152,9 @@ async function loadTenants() {
       <td>${t.email}</td>
       <td><span class="badge ${t.active ? 'badge-green' : 'badge-gray'}">${t.active ? 'ativo' : 'inativo'}</span></td>
       <td style="color:#666;font-size:12px">${new Date(t.created_at).toLocaleDateString('pt-BR')}</td>
+      <td>${t.id !== 'default' ? `<button class="btn btn-danger btn-sm" onclick="deleteTenant('${t.id}')">🗑️</button>` : ''}</td>
     </tr>
-  `).join('') || '<tr><td colspan="5" style="color:#555;text-align:center">Nenhum tenant</td></tr>'
+  `).join('') || '<tr><td colspan="6" style="color:#555;text-align:center">Nenhum tenant</td></tr>'
 
   // Popular select de tenant no form de usuários
   const sel = document.getElementById('u-tenant')
@@ -1162,6 +1163,17 @@ async function loadTenants() {
     data.map(t => `<option value="${t.id}" ${cur===t.id?'selected':''}>${t.name} (${t.id})</option>`).join('')
 
   loadUsers()
+}
+
+async function deleteTenant(id) {
+  if (!confirm(`Remover o tenant "${id}"? Isso removerá também os usuários e instâncias vinculados.`)) return
+  const res = await api('DELETE', `/api/tenants/${id}`)
+  if (res && res.ok) {
+    showToast('Tenant removido!', 'success')
+    loadTenants()
+  } else {
+    showToast(res?.error || 'Erro ao remover tenant', 'error')
+  }
 }
 
 async function createTenant() {

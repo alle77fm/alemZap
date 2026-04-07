@@ -179,6 +179,21 @@ app.post('/api/tenants', auth, (req, res) => {
   }
 })
 
+app.delete('/api/tenants/:id', auth, (req, res) => {
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Sem permissão' })
+  const { id } = req.params
+  if (id === 'default') return res.status(400).json({ error: 'Tenant padrão não pode ser removido' })
+  try {
+    db.prepare('DELETE FROM tenant_config WHERE tenant_id = ?').run(id)
+    db.prepare('DELETE FROM whatsapp_instances WHERE tenant_id = ?').run(id)
+    db.prepare('DELETE FROM users WHERE tenant_id = ?').run(id)
+    db.prepare('DELETE FROM tenants WHERE id = ?').run(id)
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
 // ── Routes: Playground & Upload ────────────────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage() })
 
