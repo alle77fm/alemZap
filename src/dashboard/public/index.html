@@ -682,29 +682,11 @@ function showApp() {
   document.getElementById('app-screen').style.display = 'flex'
   document.getElementById('app-header').style.removeProperty('display')
 
-  // Decodifica o token para pegar o role
-  const payload = JSON.parse(atob(token.split('.')[1]))
-  const role = payload.role
-
-  // Esconde menus restritos para viewer
-  if (role === 'viewer') {
-    document.querySelectorAll('.nav-item').forEach(el => {
-      const onclick = el.getAttribute('onclick') || ''
-      if (onclick.includes('tenants') || onclick.includes('playground') || onclick.includes('history')) {
-        el.style.display = 'none'
-      }
-    })
-    document.getElementById('bot-toggle-btn').style.display = 'none'
-  }
-
-  // Define tenant correto pelo token
   currentTenant = getTenantFromToken()
   const role = getRoleFromToken()
 
-  // Esconde menus restritos para viewer
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.style.display = ''
-  })
+  document.querySelectorAll('.nav-item').forEach(el => el.style.display = '')
+
   if (role === 'viewer') {
     document.querySelectorAll('.nav-item').forEach(el => {
       const onclick = el.getAttribute('onclick') || ''
